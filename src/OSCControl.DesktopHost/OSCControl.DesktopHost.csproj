@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
+    <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+    <TargetPlatformVersion>7.0</TargetPlatformVersion>
+    <TargetPlatformDisplayName>Windows</TargetPlatformDisplayName>
+    <TargetPlatformSdkPath>C:\Program Files (x86)\Windows Kits\8.1\</TargetPlatformSdkPath>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OSCControl.Compiler\OSCControl.Compiler.csproj" />
+  </ItemGroup>
+</Project>

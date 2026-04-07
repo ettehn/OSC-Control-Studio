@@ -1,0 +1,13 @@
+vrchat.endpoint {
+    host: "127.0.0.1"
+    inputPort: 9000
+    outputPort: 9001
+}
+
+on vrchat.avatar_change [
+    vrchat.chat "avatar switched" send=true notify=false
+]
+
+on vrchat.param GestureLeft [
+    vrchat.input Jump = arg(0)
+]

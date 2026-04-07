@@ -1,0 +1,17 @@
+endpoint vrchat: osc.udp {
+    mode: output
+    host: "127.0.0.1"
+    port: 9001
+    codec: osc
+}
+
+on startup [
+    vrchat.param GestureLeft = 3
+    vrchat.input Jump = 1
+    vrchat.chat "Hello from OSCControl" send=true notify=false
+    vrchat.typing true
+]
+
+on vrchat.avatar_change [
+    log info "avatar changed"
+]

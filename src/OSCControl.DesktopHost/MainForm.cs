@@ -1,0 +1,1745 @@
+using System.ComponentModel;
+using OSCControl.Compiler.Compiler;
+using OSCControl.Compiler.Diagnostics;
+
+namespace OSCControl.DesktopHost;
+
+internal sealed class MainForm : Form
+{
+    private readonly RuntimeAppController _controller = new();
+    private readonly BlockDocument _blocks = BlockDocument.CreateDefault();
+    private readonly BindingSource _endpointBindingSource = new();
+    private readonly BindingSource _ruleBindingSource = new();
+    private readonly BindingSource _stepBindingSource = new();
+    private readonly TextBox _pathTextBox;
+    private readonly TabControl _editorTabs;
+    private readonly TabPage _scriptTab;
+    private readonly TabPage _blocksTab;
+    private readonly TextBox _editorTextBox;
+    private TextBox _blocksPreviewTextBox = null!;
+    private readonly ListView _diagnosticsView;
+    private readonly RichTextBox _runtimeOutputTextBox;
+    private readonly ToolStripStatusLabel _statusLabel;
+    private readonly Button _reloadButton;
+    private readonly Button _saveButton;
+    private readonly Button _checkButton;
+    private readonly Button _startButton;
+    private readonly Button _stopButton;
+    private SplitContainer _blocksOuterSplit = null!;
+    private SplitContainer _blocksInnerSplit = null!;
+    private SplitContainer _blocksRuleSplit = null!;
+    private DataGridView _endpointGrid = null!;
+    private ListBox _rulesListBox = null!;
+    private ComboBox _triggerComboBox = null!;
+    private TextBox _ruleEndpointTextBox = null!;
+    private TextBox _ruleAddressTextBox = null!;
+    private TextBox _ruleWhenTextBox = null!;
+    private ListBox _stepsListBox = null!;
+    private Label _stepHintLabel = null!;
+    private ComboBox _stepKindComboBox = null!;
+    private TextBox _stepTargetTextBox = null!;
+    private TextBox _stepValueTextBox = null!;
+    private ComboBox _stepPayloadComboBox = null!;
+    private TextBox _stepExtraTextBox = null!;
+    private Button _stepEnterBodyButton = null!;
+    private Button _stepBackButton = null!;
+    private readonly Control _blocksEditorRoot;
+    private readonly bool _useSimplifiedChinese = DesktopLocalization.UseSimplifiedChinese();
+    private readonly Stack<StepContainerContext> _stepContainerStack = new();
+    private bool _suppressBlockEvents;
+    private bool _blockSplittersInitialized;
+
+    public MainForm()
+    {
+        Text = L("OSCControl ��������", "OSCControl Desktop Host");
+        Width = 1360;
+        Height = 880;
+        MinimumSize = new Size(1080, 720);
+        StartPosition = FormStartPosition.CenterScreen;
+
+        var chromeFont = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
+        var monoFont = new Font("Consolas", 10.5F, FontStyle.Regular, GraphicsUnit.Point);
+        Font = chromeFont;
+
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(12),
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        Controls.Add(root);
+
+        var topPanel = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 7,
+            Margin = new Padding(0, 0, 0, 12),
+        };
+        topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        for (var i = 0; i < 5; i++)
+        {
+            topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+        root.Controls.Add(topPanel, 0, 0);
+
+        var pathLabel = new Label
+        {
+            Text = L("�ű�", "Script"),
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 8, 8, 0),
+        };
+        topPanel.Controls.Add(pathLabel, 0, 0);
+
+        _pathTextBox = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 8, 0),
+        };
+        topPanel.Controls.Add(_pathTextBox, 1, 0);
+
+        var browseButton = CreateButton(L("��", "Open"), async (_, _) => await BrowseAsync());
+        topPanel.Controls.Add(browseButton, 2, 0);
+
+        _reloadButton = CreateButton(L("���¼���", "Reload"), async (_, _) => await ReloadAsync());
+        topPanel.Controls.Add(_reloadButton, 3, 0);
+
+        _saveButton = CreateButton(L("����", "Save"), async (_, _) => await SaveAsync());
+        topPanel.Controls.Add(_saveButton, 4, 0);
+
+        _checkButton = CreateButton(L("���", "Check"), async (_, _) => await CheckAsync());
+        topPanel.Controls.Add(_checkButton, 5, 0);
+
+        var runPanel = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(8, 0, 0, 0),
+        };
+        topPanel.Controls.Add(runPanel, 6, 0);
+
+        _startButton = CreateButton(L("���", "Start"), async (_, _) => await StartAsync());
+        runPanel.Controls.Add(_startButton);
+
+        _stopButton = CreateButton(L("ֹͣ", "Stop"), async (_, _) => await StopAsync());
+        _stopButton.Enabled = false;
+        runPanel.Controls.Add(_stopButton);
+
+        _editorTabs = new TabControl
+        {
+            Dock = DockStyle.Fill,
+        };
+        root.Controls.Add(_editorTabs, 0, 1);
+
+        _scriptTab = new TabPage(L("�ű�", "Script"));
+        _editorTabs.TabPages.Add(_scriptTab);
+
+        _editorTextBox = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            AcceptsTab = true,
+            ScrollBars = ScrollBars.Both,
+            WordWrap = false,
+            Font = monoFont,
+            BorderStyle = BorderStyle.FixedSingle,
+            Text = "on startup [\r\n    log info \"ready\"\r\n]\r\n",
+        };
+        _scriptTab.Controls.Add(_editorTextBox);
+
+        _blocksTab = new TabPage(L("��ľ", "Blocks"));
+        _editorTabs.TabPages.Add(_blocksTab);
+        _blocksEditorRoot = CreateBlocksEditor(monoFont);
+        _blocksTab.Controls.Add(_blocksEditorRoot);
+
+        var diagnosticsTab = new TabPage(L("���", "Diagnostics"));
+        _editorTabs.TabPages.Add(diagnosticsTab);
+
+        _diagnosticsView = new ListView
+        {
+            Dock = DockStyle.Fill,
+            View = View.Details,
+            FullRowSelect = true,
+            GridLines = true,
+        };
+        _diagnosticsView.Columns.Add(L("���ؼ���", "Severity"), 90);
+        _diagnosticsView.Columns.Add(L("��", "Line"), 60);
+        _diagnosticsView.Columns.Add(L("��", "Column"), 70);
+        _diagnosticsView.Columns.Add(L("��Ϣ", "Message"), 900);
+        diagnosticsTab.Controls.Add(_diagnosticsView);
+
+        var runtimeTab = new TabPage(L("����ʱ", "Runtime"));
+        _editorTabs.TabPages.Add(runtimeTab);
+
+        _runtimeOutputTextBox = new RichTextBox
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            Font = monoFont,
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+        };
+        runtimeTab.Controls.Add(_runtimeOutputTextBox);
+
+        var statusStrip = new StatusStrip();
+        _statusLabel = new ToolStripStatusLabel(L("����", "Idle"));
+        statusStrip.Items.Add(_statusLabel);
+        Controls.Add(statusStrip);
+
+        _controller.RuntimeOutput += message => PostToUi(() => AppendRuntimeOutput(message));
+        _controller.StatusChanged += status => PostToUi(() => UpdateStatus(status));
+
+        WireBlockEvents();
+        UpdateBlocksPreview();
+        RenderDiagnostics(_controller.Compile(_editorTextBox.Text));
+
+        FormClosed += OnFormClosedAsync;
+        Shown += (_, _) => ResetBottomSplit();
+        Resize += (_, _) => ResetBottomSplit();
+    }
+
+    private BlockStep? SelectedStep => _stepsListBox.SelectedItem as BlockStep;
+    private BindingList<BlockStep>? CurrentStepContainer => _stepContainerStack.Count == 0 ? null : _stepContainerStack.Peek().Steps;
+    private bool IsAtRootStepContainer => _stepContainerStack.Count <= 1;
+
+    private string L(string zhHans, string english) => _useSimplifiedChinese ? zhHans : english;
+
+    private List<OptionItem<BlockEndpointTransport>> GetEndpointTransportOptions() => new()
+    {
+        new(BlockEndpointTransport.OscUdp, L("OSC UDP", "OSC UDP")),
+        new(BlockEndpointTransport.WsClient, L("WebSocket �ͻ���", "WebSocket Client")),
+        new(BlockEndpointTransport.WsServer, L("WebSocket �����", "WebSocket Server")),
+        new(BlockEndpointTransport.Vrchat, "VRChat"),
+    };
+
+    private List<OptionItem<BlockEndpointMode>> GetEndpointModeOptions() => new()
+    {
+        new(BlockEndpointMode.Input, L("����", "Input")),
+        new(BlockEndpointMode.Output, L("���", "Output")),
+    };
+
+    private List<OptionItem<BlockTriggerKind>> GetTriggerOptions() => new()
+    {
+        new(BlockTriggerKind.Startup, L("���", "Startup")),
+        new(BlockTriggerKind.Receive, L("����", "Receive")),
+        new(BlockTriggerKind.VrchatAvatarChange, L("VRChat ģ���л�", "VRChat Avatar Change")),
+        new(BlockTriggerKind.VrchatParameter, L("VRChat �����仯", "VRChat Param")),
+    };
+
+    private List<OptionItem<BlockStepKind>> GetStepKindOptions() => new()
+    {
+        new(BlockStepKind.Log, L("日志", "Log")),
+        new(BlockStepKind.Store, L("存储", "Store")),
+        new(BlockStepKind.Send, L("发送", "Send")),
+        new(BlockStepKind.Stop, L("停止", "Stop")),
+        new(BlockStepKind.While, L("循环", "While")),
+        new(BlockStepKind.Break, L("跳出循环", "Break")),
+        new(BlockStepKind.Continue, L("继续下一轮", "Continue")),
+        new(BlockStepKind.VrchatParam, L("VRChat 参数", "VRChat Param")),
+        new(BlockStepKind.VrchatInput, L("VRChat 输入", "VRChat Input")),
+        new(BlockStepKind.VrchatChat, L("VRChat 聊天框", "VRChat Chatbox")),
+        new(BlockStepKind.VrchatTyping, L("VRChat 正在输入", "VRChat Typing")),
+    };
+
+    private List<OptionItem<BlockPayloadMode>> GetPayloadModeOptions() => new()
+    {
+        new(BlockPayloadMode.None, L("��", "None")),
+        new(BlockPayloadMode.Args, "Args"),
+        new(BlockPayloadMode.Body, "Body"),
+    };
+
+    private string FormatPayloadMode(BlockPayloadMode mode) => mode switch
+    {
+        BlockPayloadMode.None => L("��", "None"),
+        BlockPayloadMode.Args => "Args",
+        BlockPayloadMode.Body => "Body",
+        _ => mode.ToString(),
+    };
+
+    private Control CreateBlocksEditor(Font monoFont)
+    {
+        _endpointBindingSource.DataSource = _blocks.Endpoints;
+        _ruleBindingSource.DataSource = _blocks.Rules;
+        _stepBindingSource.DataSource = new BindingList<BlockStep>();
+
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Padding = new Padding(8),
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var noteLabel = new Label
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            MaximumSize = new Size(1280, 0),
+            Text = L("Ŀǰ��ľҳ���ǵ�����������������������˵㡢�������Ͳ��裬Ȼ������ɵĽű�Ӧ�õ��ű�ҳ���ټ��������΢����", "Blocks is a one-way visual generator for now. Build endpoints, triggers, and steps here, then apply the generated script to the Script tab when you want to save or fine-tune it."),
+            ForeColor = Color.FromArgb(55, 55, 55),
+            Margin = new Padding(0, 0, 0, 8),
+        };
+        root.Controls.Add(noteLabel, 0, 0);
+
+        var toolbar = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 0, 8),
+        };
+        root.Controls.Add(toolbar, 0, 1);
+
+        toolbar.Controls.Add(CreateButton(L("��Ӷ˵�", "Add Endpoint"), (_, _) => AddEndpoint()));
+        toolbar.Controls.Add(CreateButton(L("��� VRChat �˵�", "Add VRChat Endpoint"), (_, _) => AddVrchatEndpoint()));
+        toolbar.Controls.Add(CreateButton(L("ɾ���˵�", "Remove Endpoint"), (_, _) => RemoveSelectedEndpoint()));
+        toolbar.Controls.Add(CreateButton(L("����ű�����ľ", "Import Script To Blocks"), (_, _) => ImportScriptToBlocks()));
+        toolbar.Controls.Add(CreateButton(L("Ԥ���ű�", "Preview Script"), (_, _) => UpdateBlocksPreview()));
+        toolbar.Controls.Add(CreateButton(L("Ӧ�õ��ű�", "Apply To Script"), (_, _) => ApplyBlocksToScript()));
+
+        _blocksOuterSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Horizontal,
+            BorderStyle = BorderStyle.FixedSingle,
+            SplitterWidth = 8,
+        };
+        root.Controls.Add(_blocksOuterSplit, 0, 2);
+
+        var endpointsGroup = new GroupBox
+        {
+            Text = L("�˵�", "Endpoints"),
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8),
+        };
+        _blocksOuterSplit.Panel1.Controls.Add(endpointsGroup);
+
+        _endpointGrid = CreateGrid();
+        _endpointGrid.DataSource = _endpointBindingSource;
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Name), HeaderText = L("����", "Name"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 18 });
+        _endpointGrid.Columns.Add(new DataGridViewComboBoxColumn { DataPropertyName = nameof(BlockEndpoint.Transport), HeaderText = L("����", "Transport"), DataSource = GetEndpointTransportOptions(), DisplayMember = nameof(OptionItem<BlockEndpointTransport>.Label), ValueMember = nameof(OptionItem<BlockEndpointTransport>.Value), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 16 });
+        _endpointGrid.Columns.Add(new DataGridViewComboBoxColumn { DataPropertyName = nameof(BlockEndpoint.Mode), HeaderText = L("ģʽ", "Mode"), DataSource = GetEndpointModeOptions(), DisplayMember = nameof(OptionItem<BlockEndpointMode>.Label), ValueMember = nameof(OptionItem<BlockEndpointMode>.Value), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Host), HeaderText = L("����", "Host"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 18 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Port), HeaderText = L("�˿�", "Port"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 10 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.InputPort), HeaderText = L("����˿�", "Input Port"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 10 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Path), HeaderText = L("·��", "Path"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Codec), HeaderText = L("����", "Codec"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
+        endpointsGroup.Controls.Add(_endpointGrid);
+
+        _blocksInnerSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Horizontal,
+            BorderStyle = BorderStyle.FixedSingle,
+            SplitterWidth = 8,
+        };
+        _blocksOuterSplit.Panel2.Controls.Add(_blocksInnerSplit);
+
+        _blocksRuleSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            BorderStyle = BorderStyle.FixedSingle,
+            SplitterWidth = 8,
+        };
+        _blocksInnerSplit.Panel1.Controls.Add(_blocksRuleSplit);
+
+        var rulesGroup = new GroupBox { Text = L("����", "Rules"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        _blocksRuleSplit.Panel1.Controls.Add(rulesGroup);
+
+        var rulesLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+        rulesLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        rulesLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        rulesLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        rulesGroup.Controls.Add(rulesLayout);
+
+        _rulesListBox = new ListBox
+        {
+            Dock = DockStyle.Fill,
+            DataSource = _ruleBindingSource,
+            IntegralHeight = false,
+            HorizontalScrollbar = true,
+            DrawMode = DrawMode.OwnerDrawFixed,
+            ItemHeight = 54,
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.White,
+        };
+        rulesLayout.Controls.Add(_rulesListBox, 0, 0);
+
+        var ruleButtons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0) };
+        ruleButtons.Controls.Add(CreateButton(L("����������", "Add Startup"), (_, _) => AddRule(BlockTriggerKind.Startup)));
+        ruleButtons.Controls.Add(CreateButton(L("��ӽ��չ���", "Add Receive"), (_, _) => AddRule(BlockTriggerKind.Receive)));
+        ruleButtons.Controls.Add(CreateButton(L("���ģ���л�", "Add Avatar Change"), (_, _) => AddRule(BlockTriggerKind.VrchatAvatarChange)));
+        ruleButtons.Controls.Add(CreateButton(L("��Ӳ�������", "Add Param Trigger"), (_, _) => AddRule(BlockTriggerKind.VrchatParameter)));
+        ruleButtons.Controls.Add(CreateButton(L("����", "Move Up"), (_, _) => MoveSelectedRule(-1)));
+        ruleButtons.Controls.Add(CreateButton(L("����", "Move Down"), (_, _) => MoveSelectedRule(1)));
+        ruleButtons.Controls.Add(CreateButton(L("����", "Duplicate"), (_, _) => DuplicateSelectedRule()));
+        ruleButtons.Controls.Add(CreateButton(L("ɾ��", "Delete"), (_, _) => RemoveSelectedRule()));
+        rulesLayout.Controls.Add(ruleButtons, 0, 1);
+
+        var rulesHint = new Label
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            MaximumSize = new Size(420, 0),
+            Text = L("�����൱���¼���ջ���������ռ䲻��������ֱ���϶��ָ�����", "Rules are the block equivalent of event stacks. Drag the splitter if you want more room for this panel."),
+            ForeColor = Color.FromArgb(70, 70, 70),
+            Margin = new Padding(0, 8, 0, 0),
+        };
+        rulesLayout.Controls.Add(rulesHint, 0, 2);
+
+        var editorLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 2, Margin = new Padding(0) };
+        editorLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 138));
+        editorLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _blocksRuleSplit.Panel2.Controls.Add(editorLayout);
+        var ruleGroup = new GroupBox { Text = L("��ǰ����", "Selected Rule"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        editorLayout.Controls.Add(ruleGroup, 0, 0);
+
+        var ruleLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2 };
+        ruleLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        ruleLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        ruleLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        ruleLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        ruleLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        ruleLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        ruleGroup.Controls.Add(ruleLayout);
+
+        ruleLayout.Controls.Add(CreateFieldLabel(L("������", "Trigger")), 0, 0);
+        _triggerComboBox = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = GetTriggerOptions(), DisplayMember = nameof(OptionItem<BlockTriggerKind>.Label), ValueMember = nameof(OptionItem<BlockTriggerKind>.Value), Margin = new Padding(0, 0, 12, 8) };
+        ruleLayout.Controls.Add(_triggerComboBox, 1, 0);
+
+        ruleLayout.Controls.Add(CreateFieldLabel(L("�˵�", "Endpoint")), 2, 0);
+        _ruleEndpointTextBox = CreateFieldTextBox();
+        ruleLayout.Controls.Add(_ruleEndpointTextBox, 3, 0);
+
+        ruleLayout.Controls.Add(CreateFieldLabel(L("��ַ", "Address")), 0, 1);
+        _ruleAddressTextBox = CreateFieldTextBox();
+        ruleLayout.Controls.Add(_ruleAddressTextBox, 1, 1);
+
+        ruleLayout.Controls.Add(CreateFieldLabel(L("����", "When")), 2, 1);
+        _ruleWhenTextBox = CreateFieldTextBox();
+        ruleLayout.Controls.Add(_ruleWhenTextBox, 3, 1);
+
+        var stepsGroup = new GroupBox { Text = L("����", "Steps"), Dock = DockStyle.Fill, Padding = new Padding(8), Margin = new Padding(0, 8, 0, 0) };
+        editorLayout.Controls.Add(stepsGroup, 0, 1);
+
+        var stepsLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
+        stepsLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stepsLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        stepsLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stepsGroup.Controls.Add(stepsLayout);
+
+        _stepHintLabel = new Label
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            MaximumSize = new Size(920, 0),
+            ForeColor = Color.FromArgb(70, 70, 70),
+            Margin = new Padding(0, 0, 0, 8),
+        };
+        stepsLayout.Controls.Add(_stepHintLabel, 0, 0);
+
+        var stepsSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            BorderStyle = BorderStyle.FixedSingle,
+            SplitterWidth = 8,
+        };
+        stepsLayout.Controls.Add(stepsSplit, 0, 1);
+
+        var stepsStackGroup = new GroupBox { Text = L("����ջ", "Stack"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        stepsSplit.Panel1.Controls.Add(stepsStackGroup);
+
+        _stepsListBox = new ListBox
+        {
+            Dock = DockStyle.Fill,
+            DataSource = _stepBindingSource,
+            IntegralHeight = false,
+            HorizontalScrollbar = true,
+            DrawMode = DrawMode.OwnerDrawFixed,
+            ItemHeight = 52,
+            BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Color.White,
+        };
+        stepsStackGroup.Controls.Add(_stepsListBox);
+
+        var stepEditorGroup = new GroupBox { Text = L("��ǰ����", "Selected Step"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        stepsSplit.Panel2.Controls.Add(stepEditorGroup);
+
+        var stepEditorLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 3 };
+        stepEditorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        stepEditorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        stepEditorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        stepEditorLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        stepEditorLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stepEditorLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stepEditorLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        stepEditorGroup.Controls.Add(stepEditorLayout);
+
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("����", "Step")), 0, 0);
+        _stepKindComboBox = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = GetStepKindOptions(), DisplayMember = nameof(OptionItem<BlockStepKind>.Label), ValueMember = nameof(OptionItem<BlockStepKind>.Value), Margin = new Padding(0, 0, 12, 8) };
+        stepEditorLayout.Controls.Add(_stepKindComboBox, 1, 0);
+
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("Ŀ��", "Target")), 2, 0);
+        _stepTargetTextBox = CreateFieldTextBox();
+        stepEditorLayout.Controls.Add(_stepTargetTextBox, 3, 0);
+
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("ֵ", "Value")), 0, 1);
+        _stepValueTextBox = CreateFieldTextBox();
+        stepEditorLayout.Controls.Add(_stepValueTextBox, 1, 1);
+
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("����", "Payload")), 2, 1);
+        _stepPayloadComboBox = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = GetPayloadModeOptions(), DisplayMember = nameof(OptionItem<BlockPayloadMode>.Label), ValueMember = nameof(OptionItem<BlockPayloadMode>.Value), Margin = new Padding(0, 0, 0, 8) };
+        stepEditorLayout.Controls.Add(_stepPayloadComboBox, 3, 1);
+
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("����", "Extra")), 0, 2);
+        _stepExtraTextBox = CreateFieldTextBox();
+        stepEditorLayout.Controls.Add(_stepExtraTextBox, 1, 2);
+        stepEditorLayout.SetColumnSpan(_stepExtraTextBox, 3);
+
+        var stepButtons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0) };
+        stepButtons.Controls.Add(CreateButton(L("添加日志", "Add Log"), (_, _) => AddStep(BlockStepKind.Log)));
+        stepButtons.Controls.Add(CreateButton(L("添加存储", "Add Store"), (_, _) => AddStep(BlockStepKind.Store)));
+        stepButtons.Controls.Add(CreateButton(L("添加发送", "Add Send"), (_, _) => AddStep(BlockStepKind.Send)));
+        stepButtons.Controls.Add(CreateButton(L("添加循环", "Add While"), (_, _) => AddStep(BlockStepKind.While)));
+        stepButtons.Controls.Add(CreateButton(L("添加跳出", "Add Break"), (_, _) => AddStep(BlockStepKind.Break)));
+        stepButtons.Controls.Add(CreateButton(L("添加继续", "Add Continue"), (_, _) => AddStep(BlockStepKind.Continue)));
+        stepButtons.Controls.Add(CreateButton(L("添加停止", "Add Stop"), (_, _) => AddStep(BlockStepKind.Stop)));
+        stepButtons.Controls.Add(CreateButton(L("添加 VRChat 参数", "Add VRChat Param"), (_, _) => AddStep(BlockStepKind.VrchatParam)));
+        stepButtons.Controls.Add(CreateButton(L("添加 VRChat 输入", "Add VRChat Input"), (_, _) => AddStep(BlockStepKind.VrchatInput)));
+        stepButtons.Controls.Add(CreateButton(L("添加 VRChat 聊天", "Add VRChat Chat"), (_, _) => AddStep(BlockStepKind.VrchatChat)));
+        stepButtons.Controls.Add(CreateButton(L("添加 VRChat 输入状态", "Add VRChat Typing"), (_, _) => AddStep(BlockStepKind.VrchatTyping)));
+        _stepEnterBodyButton = CreateButton(L("进入循环体", "Enter Body"), (_, _) => EnterSelectedStepBody());
+        stepButtons.Controls.Add(_stepEnterBodyButton);
+        _stepBackButton = CreateButton(L("返回上一层", "Back"), (_, _) => ExitStepBody());
+        stepButtons.Controls.Add(_stepBackButton);
+        stepButtons.Controls.Add(CreateButton(L("上移", "Move Up"), (_, _) => MoveSelectedStep(-1)));
+        stepButtons.Controls.Add(CreateButton(L("下移", "Move Down"), (_, _) => MoveSelectedStep(1)));
+        stepButtons.Controls.Add(CreateButton(L("复制", "Duplicate"), (_, _) => DuplicateSelectedStep()));
+        stepButtons.Controls.Add(CreateButton(L("删除", "Delete"), (_, _) => RemoveSelectedStep()));
+        stepsLayout.Controls.Add(stepButtons, 0, 2);
+
+        var previewGroup = new GroupBox { Text = L("���ɽű�Ԥ��", "Generated Script Preview"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        _blocksInnerSplit.Panel2.Controls.Add(previewGroup);
+
+        _blocksPreviewTextBox = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Both,
+            WordWrap = false,
+            Font = monoFont,
+            BackColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+        };
+        previewGroup.Controls.Add(_blocksPreviewTextBox);
+
+        if (_blocks.Rules.Count > 0)
+        {
+            _rulesListBox.SelectedItem = _blocks.Rules[0];
+        }
+
+        BindSelectedRule();
+        return root;
+    }
+
+    private void WireBlockEvents()
+    {
+        _rulesListBox.SelectedIndexChanged += (_, _) => BindSelectedRule();
+        _rulesListBox.DrawItem += DrawRuleItem;
+        _triggerComboBox.SelectedIndexChanged += (_, _) => UpdateSelectedRuleFromEditor();
+        _ruleEndpointTextBox.TextChanged += (_, _) => UpdateSelectedRuleFromEditor();
+        _ruleAddressTextBox.TextChanged += (_, _) => UpdateSelectedRuleFromEditor();
+        _ruleWhenTextBox.TextChanged += (_, _) => UpdateSelectedRuleFromEditor();
+
+        _endpointGrid.CellValueChanged += (_, _) => UpdateBlocksPreview();
+        _endpointGrid.RowsRemoved += (_, _) => UpdateBlocksPreview();
+        _endpointGrid.CurrentCellDirtyStateChanged += (_, _) => CommitGridEdit(_endpointGrid);
+        _endpointGrid.DataError += (_, _) => { };
+
+        _stepsListBox.SelectedIndexChanged += (_, _) => BindSelectedStep();
+        _stepsListBox.DrawItem += DrawStepItem;
+        _stepKindComboBox.SelectedIndexChanged += (_, _) => UpdateSelectedStepFromEditor();
+        _stepTargetTextBox.TextChanged += (_, _) => UpdateSelectedStepFromEditor();
+        _stepValueTextBox.TextChanged += (_, _) => UpdateSelectedStepFromEditor();
+        _stepPayloadComboBox.SelectedIndexChanged += (_, _) => UpdateSelectedStepFromEditor();
+        _stepExtraTextBox.TextChanged += (_, _) => UpdateSelectedStepFromEditor();
+    }
+
+    private async void OnFormClosedAsync(object? sender, FormClosedEventArgs e)
+    {
+        Enabled = false;
+        await _controller.DisposeAsync();
+    }
+
+    private async Task BrowseAsync()
+    {
+        using var dialog = new OpenFileDialog { Filter = "OSCControl Files (*.osccontrol)|*.osccontrol|All Files (*.*)|*.*", CheckFileExists = true, Multiselect = false };
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        _pathTextBox.Text = dialog.FileName;
+        _editorTextBox.Text = await File.ReadAllTextAsync(dialog.FileName);
+        _editorTabs.SelectedTab = _scriptTab;
+        UpdateStatus(L("�ѽ��ű����ص��ű�ҳ����ľ�ݸ�δ�Ķ���", "Loaded script into Script tab. Blocks draft was left unchanged."));
+        await CheckAsync();
+    }
+
+    private async Task ReloadAsync()
+    {
+        var path = _pathTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+        {
+            UpdateStatus(L("����ѡ��ű��ļ�", "Select a script file first"));
+            return;
+        }
+
+        _editorTextBox.Text = await File.ReadAllTextAsync(path);
+        _editorTabs.SelectedTab = _scriptTab;
+        UpdateStatus(L("�ѽ��ű����¼��ص��ű�ҳ����ľ�ݸ�δ�Ķ���", "Reloaded script into Script tab. Blocks draft was left unchanged."));
+        await CheckAsync();
+    }
+
+    private async Task SaveAsync()
+    {
+        var path = _pathTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            using var dialog = new SaveFileDialog { Filter = "OSCControl Files (*.osccontrol)|*.osccontrol|All Files (*.*)|*.*", FileName = "script.osccontrol" };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            path = dialog.FileName;
+            _pathTextBox.Text = path;
+        }
+
+        var source = GetCurrentSource();
+        await File.WriteAllTextAsync(path, source);
+        if (_editorTabs.SelectedTab == _blocksTab)
+        {
+            _editorTextBox.Text = source;
+        }
+
+        UpdateStatus(L("�ѱ���", "Saved"));
+    }
+
+    private Task CheckAsync()
+    {
+        var result = _controller.Compile(GetCurrentSource());
+        RenderDiagnostics(result);
+        UpdateStatus(result.HasErrors ? L("���������Ϣ", "Diagnostics found") : L("����", "Ready"));
+        return Task.CompletedTask;
+    }
+    private async Task StartAsync()
+    {
+        await SetBusyAsync(true);
+        try
+        {
+            _runtimeOutputTextBox.Clear();
+            var result = await _controller.StartAsync(GetCurrentSource(), CancellationToken.None);
+            RenderDiagnostics(result);
+            if (result.HasErrors)
+            {
+                _stopButton.Enabled = false;
+                _startButton.Enabled = true;
+                _statusLabel.Text = L("����ʧ��", "Compile failed");
+                return;
+            }
+
+            _startButton.Enabled = false;
+            _stopButton.Enabled = true;
+        }
+        catch (Exception ex)
+        {
+            AppendRuntimeOutput($"{L("����ʱ���ʧ��", "Runtime start failed")}: {ex.Message}");
+            UpdateStatus(L("���ʧ��", "Start failed"));
+            _startButton.Enabled = true;
+            _stopButton.Enabled = false;
+        }
+        finally
+        {
+            SetEditingEnabled(true);
+        }
+    }
+
+    private async Task StopAsync()
+    {
+        await SetBusyAsync(true);
+        try
+        {
+            await _controller.StopAsync();
+            AppendRuntimeOutput(L("����ʱ��ֹͣ��", "Runtime stopped."));
+            _startButton.Enabled = true;
+            _stopButton.Enabled = false;
+        }
+        finally
+        {
+            SetEditingEnabled(true);
+        }
+    }
+
+    private void RenderDiagnostics(CompilationResult result)
+    {
+        _diagnosticsView.BeginUpdate();
+        try
+        {
+            _diagnosticsView.Items.Clear();
+            foreach (var diagnostic in result.Diagnostics)
+            {
+                var item = new ListViewItem(diagnostic.Severity.ToString());
+                item.SubItems.Add(diagnostic.Span.Start.Line.ToString());
+                item.SubItems.Add(diagnostic.Span.Start.Column.ToString());
+                item.SubItems.Add(diagnostic.Message);
+                item.ForeColor = diagnostic.Severity == DiagnosticSeverity.Error ? Color.Firebrick : Color.DarkGoldenrod;
+                _diagnosticsView.Items.Add(item);
+            }
+
+            if (result.Diagnostics.Count == 0)
+            {
+                var item = new ListViewItem(L("��Ϣ", "Info"));
+                item.SubItems.Add("-");
+                item.SubItems.Add("-");
+                item.SubItems.Add(L("û�������Ϣ��", "No diagnostics."));
+                item.ForeColor = Color.SeaGreen;
+                _diagnosticsView.Items.Add(item);
+            }
+        }
+        finally
+        {
+            _diagnosticsView.EndUpdate();
+        }
+    }
+
+    private void AppendRuntimeOutput(string message)
+    {
+        _runtimeOutputTextBox.AppendText(message + Environment.NewLine);
+        _runtimeOutputTextBox.SelectionStart = _runtimeOutputTextBox.TextLength;
+        _runtimeOutputTextBox.ScrollToCaret();
+    }
+
+    private void UpdateStatus(string status)
+    {
+        _statusLabel.Text = status;
+    }
+
+    private Button CreateButton(string text, EventHandler handler)
+    {
+        var button = new Button { Text = text, AutoSize = true, Margin = new Padding(0, 0, 8, 0), Padding = new Padding(12, 4, 12, 4) };
+        button.Click += handler;
+        return button;
+    }
+
+    private static Label CreateFieldLabel(string text) => new() { Text = text, AutoSize = true, TextAlign = ContentAlignment.MiddleLeft, Margin = new Padding(0, 7, 8, 0) };
+
+    private static TextBox CreateFieldTextBox() => new() { Dock = DockStyle.Fill, Margin = new Padding(0, 0, 0, 8) };
+
+    private static DataGridView CreateGrid()
+    {
+        return new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            AutoGenerateColumns = false,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            MultiSelect = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            RowHeadersVisible = false,
+            AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.DisplayedCellsExceptHeaders,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+        };
+    }
+
+    private void AddEndpoint()
+    {
+        _blocks.Endpoints.Add(new BlockEndpoint
+        {
+            Name = $"endpoint{_blocks.Endpoints.Count + 1}",
+            Transport = BlockEndpointTransport.OscUdp,
+            Mode = BlockEndpointMode.Input,
+            Host = "127.0.0.1",
+            Port = 9000 + _blocks.Endpoints.Count,
+            Codec = "osc"
+        });
+        UpdateBlocksPreview();
+    }
+
+    private void AddVrchatEndpoint()
+    {
+        if (_blocks.Endpoints.Any(endpoint => endpoint.Transport == BlockEndpointTransport.Vrchat))
+        {
+            UpdateStatus(L("�Ѿ����� VRChat �˵㡣", "VRChat endpoint already exists."));
+            return;
+        }
+
+        _blocks.Endpoints.Add(new BlockEndpoint
+        {
+            Name = "vrchat",
+            Transport = BlockEndpointTransport.Vrchat,
+            Mode = BlockEndpointMode.Output,
+            Host = "127.0.0.1",
+            Port = 9001,
+            InputPort = 9000,
+            Codec = "osc"
+        });
+        _endpointBindingSource.ResetBindings(false);
+        UpdateBlocksPreview();
+    }
+
+    private void RemoveSelectedEndpoint()
+    {
+        if (_endpointGrid.CurrentRow?.DataBoundItem is not BlockEndpoint endpoint)
+        {
+            return;
+        }
+
+        _blocks.Endpoints.Remove(endpoint);
+        UpdateBlocksPreview();
+    }
+
+    private void EnsureVrchatEndpoint()
+    {
+        if (_blocks.Endpoints.Any(endpoint => endpoint.Transport == BlockEndpointTransport.Vrchat))
+        {
+            return;
+        }
+
+        _blocks.Endpoints.Add(new BlockEndpoint
+        {
+            Name = "vrchat",
+            Transport = BlockEndpointTransport.Vrchat,
+            Mode = BlockEndpointMode.Output,
+            Host = "127.0.0.1",
+            Port = 9001,
+            InputPort = 9000,
+            Codec = "osc"
+        });
+        _endpointBindingSource.ResetBindings(false);
+    }
+
+    private void AddRule(BlockTriggerKind trigger)
+    {
+        if (trigger is BlockTriggerKind.VrchatAvatarChange or BlockTriggerKind.VrchatParameter)
+        {
+            EnsureVrchatEndpoint();
+        }
+
+        var rule = new BlockRule
+        {
+            Trigger = trigger,
+            EndpointName = trigger switch
+            {
+                BlockTriggerKind.Receive => _blocks.Endpoints.FirstOrDefault(endpoint => endpoint.Transport != BlockEndpointTransport.Vrchat && endpoint.Mode == BlockEndpointMode.Input)?.Name
+                    ?? _blocks.Endpoints.FirstOrDefault(endpoint => endpoint.Mode == BlockEndpointMode.Input)?.Name
+                    ?? string.Empty,
+                BlockTriggerKind.VrchatParameter => "GestureLeft",
+                _ => string.Empty,
+            },
+            Address = trigger == BlockTriggerKind.Receive ? "/example" : string.Empty,
+        };
+        var step = CreateDefaultStep(BlockStepKind.Log);
+        step.Value = trigger switch
+        {
+            BlockTriggerKind.Startup => "ready",
+            BlockTriggerKind.VrchatAvatarChange => "avatar changed",
+            BlockTriggerKind.VrchatParameter => "arg(0)",
+            _ => "got message"
+        };
+        rule.Steps.Add(step);
+
+        _blocks.Rules.Add(rule);
+        RefreshRuleDisplay();
+        _rulesListBox.SelectedItem = rule;
+        UpdateBlocksPreview();
+    }
+
+    private void RemoveSelectedRule()
+    {
+        if (_rulesListBox.SelectedItem is not BlockRule rule)
+        {
+            return;
+        }
+
+        var index = _rulesListBox.SelectedIndex;
+        _blocks.Rules.Remove(rule);
+        RefreshRuleDisplay();
+        if (_blocks.Rules.Count > 0)
+        {
+            _rulesListBox.SelectedIndex = Math.Min(index, _blocks.Rules.Count - 1);
+        }
+        else
+        {
+            BindSelectedRule();
+        }
+
+        UpdateBlocksPreview();
+    }
+
+    private void MoveSelectedRule(int offset)
+    {
+        if (_rulesListBox.SelectedItem is not BlockRule rule)
+        {
+            return;
+        }
+
+        var currentIndex = _blocks.Rules.IndexOf(rule);
+        if (currentIndex < 0)
+        {
+            return;
+        }
+
+        var targetIndex = currentIndex + offset;
+        if (targetIndex < 0 || targetIndex >= _blocks.Rules.Count)
+        {
+            return;
+        }
+
+        _blocks.Rules.RemoveAt(currentIndex);
+        _blocks.Rules.Insert(targetIndex, rule);
+        RefreshRuleDisplay();
+        _rulesListBox.SelectedItem = rule;
+        UpdateBlocksPreview();
+    }
+
+    private void DuplicateSelectedRule()
+    {
+        if (_rulesListBox.SelectedItem is not BlockRule rule)
+        {
+            return;
+        }
+
+        var clone = CloneRule(rule);
+        var insertIndex = _blocks.Rules.IndexOf(rule) + 1;
+        _blocks.Rules.Insert(insertIndex, clone);
+        RefreshRuleDisplay();
+        _rulesListBox.SelectedItem = clone;
+        UpdateBlocksPreview();
+    }
+
+    private void AddStep(BlockStepKind kind)
+    {
+        if (_rulesListBox.SelectedItem is not BlockRule)
+        {
+            return;
+        }
+
+        if (kind is BlockStepKind.VrchatParam or BlockStepKind.VrchatInput or BlockStepKind.VrchatChat or BlockStepKind.VrchatTyping)
+        {
+            EnsureVrchatEndpoint();
+        }
+
+        var container = CurrentStepContainer;
+        if (container is null)
+        {
+            return;
+        }
+
+        var step = CreateDefaultStep(kind);
+        container.Add(step);
+        RefreshStepDisplay();
+        SelectStep(step);
+        RefreshRuleDisplay();
+        UpdateBlocksPreview();
+    }
+
+    private void RemoveSelectedStep()
+    {
+        if (CurrentStepContainer is not { } container || SelectedStep is not BlockStep step)
+        {
+            return;
+        }
+
+        var index = container.IndexOf(step);
+        container.Remove(step);
+        RefreshStepDisplay();
+        if (container.Count > 0)
+        {
+            SelectStep(container[Math.Min(index, container.Count - 1)]);
+        }
+        else
+        {
+            BindSelectedStep();
+        }
+
+        RefreshRuleDisplay();
+        UpdateBlocksPreview();
+    }
+
+    private void MoveSelectedStep(int offset)
+    {
+        if (CurrentStepContainer is not { } container || SelectedStep is not BlockStep step)
+        {
+            return;
+        }
+
+        var currentIndex = container.IndexOf(step);
+        if (currentIndex < 0)
+        {
+            return;
+        }
+
+        var targetIndex = currentIndex + offset;
+        if (targetIndex < 0 || targetIndex >= container.Count)
+        {
+            return;
+        }
+
+        container.RemoveAt(currentIndex);
+        container.Insert(targetIndex, step);
+        RefreshStepDisplay();
+        SelectStep(step);
+        RefreshRuleDisplay();
+        UpdateBlocksPreview();
+    }
+
+    private void DuplicateSelectedStep()
+    {
+        if (CurrentStepContainer is not { } container || SelectedStep is not BlockStep step)
+        {
+            return;
+        }
+
+        var clone = CloneStep(step);
+        var insertIndex = container.IndexOf(step) + 1;
+        container.Insert(insertIndex, clone);
+        RefreshStepDisplay();
+        SelectStep(clone);
+        RefreshRuleDisplay();
+        UpdateBlocksPreview();
+    }
+
+    private static BlockRule CloneRule(BlockRule source)
+    {
+        var clone = new BlockRule
+        {
+            Trigger = source.Trigger,
+            EndpointName = source.EndpointName,
+            Address = source.Address,
+            WhenExpression = source.WhenExpression,
+        };
+
+        foreach (var step in source.Steps)
+        {
+            clone.Steps.Add(CloneStep(step));
+        }
+
+        return clone;
+    }
+
+    private static BlockStep CloneStep(BlockStep source)
+    {
+        var clone = new BlockStep
+        {
+            Kind = source.Kind,
+            Target = source.Target,
+            Value = source.Value,
+            PayloadMode = source.PayloadMode,
+            Extra = source.Extra,
+        };
+
+        foreach (var child in source.Children)
+        {
+            clone.Children.Add(CloneStep(child));
+        }
+
+        return clone;
+    }
+
+    private static BlockStep CreateDefaultStep(BlockStepKind kind) => kind switch
+    {
+        BlockStepKind.Log => new BlockStep { Kind = BlockStepKind.Log, Target = "info", Value = "next step" },
+        BlockStepKind.Store => new BlockStep { Kind = BlockStepKind.Store, Target = "state_value", Value = "arg(0)" },
+        BlockStepKind.Send => new BlockStep { Kind = BlockStepKind.Send, Target = string.Empty, Value = "/example", PayloadMode = BlockPayloadMode.Args, Extra = "1, 2, 3" },
+        BlockStepKind.While => CreateDefaultWhileStep(),
+        BlockStepKind.Break => new BlockStep { Kind = BlockStepKind.Break },
+        BlockStepKind.Continue => new BlockStep { Kind = BlockStepKind.Continue },
+        BlockStepKind.Stop => new BlockStep { Kind = BlockStepKind.Stop },
+        BlockStepKind.VrchatParam => new BlockStep { Kind = BlockStepKind.VrchatParam, Target = "GestureLeft", Value = "3" },
+        BlockStepKind.VrchatInput => new BlockStep { Kind = BlockStepKind.VrchatInput, Target = "Jump", Value = "1" },
+        BlockStepKind.VrchatChat => new BlockStep { Kind = BlockStepKind.VrchatChat, Value = "Hello from OSCControl", Extra = "send=true notify=false" },
+        BlockStepKind.VrchatTyping => new BlockStep { Kind = BlockStepKind.VrchatTyping, Value = "true" },
+        _ => new BlockStep { Kind = kind }
+    };
+
+    private static BlockStep CreateDefaultWhileStep()
+    {
+        var step = new BlockStep
+        {
+            Kind = BlockStepKind.While,
+            Value = "state(\"count\") < 3",
+        };
+        step.Children.Add(new BlockStep { Kind = BlockStepKind.Break });
+        return step;
+    }
+
+    private void BindSelectedRule()
+    {
+        _suppressBlockEvents = true;
+        try
+        {
+            if (_rulesListBox.SelectedItem is not BlockRule rule)
+            {
+                _triggerComboBox.Enabled = false;
+                _ruleEndpointTextBox.Enabled = false;
+                _ruleAddressTextBox.Enabled = false;
+                _ruleWhenTextBox.Enabled = false;
+                _triggerComboBox.SelectedValue = BlockTriggerKind.Startup;
+                _ruleEndpointTextBox.Text = string.Empty;
+                _ruleAddressTextBox.Text = string.Empty;
+                _ruleWhenTextBox.Text = string.Empty;
+                _stepContainerStack.Clear();
+                _stepBindingSource.DataSource = new BindingList<BlockStep>();
+                _stepsListBox.DataSource = _stepBindingSource;
+                _stepsListBox.ClearSelected();
+                UpdateStepNavigationButtons();
+                return;
+            }
+
+            _triggerComboBox.Enabled = true;
+            _ruleEndpointTextBox.Enabled = true;
+            _ruleAddressTextBox.Enabled = true;
+            _ruleWhenTextBox.Enabled = true;
+            _triggerComboBox.SelectedValue = rule.Trigger;
+            _ruleEndpointTextBox.Text = rule.EndpointName;
+            _ruleAddressTextBox.Text = rule.Address;
+            _ruleWhenTextBox.Text = rule.WhenExpression;
+            ResetToRuleStepContainer(rule);
+        }
+        finally
+        {
+            _suppressBlockEvents = false;
+        }
+
+        if (_rulesListBox.SelectedItem is BlockRule selectedRule && selectedRule.Steps.Count > 0)
+        {
+            SelectStep(selectedRule.Steps[0]);
+        }
+        else
+        {
+            BindSelectedStep();
+        }
+    }
+
+    private void BindSelectedStep()
+    {
+        _suppressBlockEvents = true;
+        try
+        {
+            if (SelectedStep is not BlockStep step)
+            {
+                _stepKindComboBox.Enabled = false;
+                _stepTargetTextBox.Enabled = false;
+                _stepValueTextBox.Enabled = false;
+                _stepPayloadComboBox.Enabled = false;
+                _stepExtraTextBox.Enabled = false;
+                _stepKindComboBox.SelectedValue = BlockStepKind.Log;
+                _stepTargetTextBox.Text = string.Empty;
+                _stepValueTextBox.Text = string.Empty;
+                _stepPayloadComboBox.SelectedValue = BlockPayloadMode.None;
+                _stepExtraTextBox.Text = string.Empty;
+                UpdateStepNavigationButtons();
+                UpdateStepHint();
+                return;
+            }
+
+            _stepKindComboBox.SelectedValue = step.Kind;
+            _stepTargetTextBox.Text = step.Target;
+            _stepValueTextBox.Text = step.Value;
+            _stepPayloadComboBox.SelectedValue = step.PayloadMode;
+            _stepExtraTextBox.Text = step.Extra;
+            ApplyStepEditorState(step.Kind);
+        }
+        finally
+        {
+            _suppressBlockEvents = false;
+        }
+
+        UpdateStepNavigationButtons();
+        UpdateStepHint();
+    }
+
+    private void ApplyStepEditorState(BlockStepKind kind)
+    {
+        var hasStep = SelectedStep is not null;
+        _stepKindComboBox.Enabled = hasStep;
+        _stepTargetTextBox.Enabled = hasStep && kind is BlockStepKind.Log or BlockStepKind.Store or BlockStepKind.Send or BlockStepKind.VrchatParam or BlockStepKind.VrchatInput;
+        _stepValueTextBox.Enabled = hasStep && kind is BlockStepKind.Log or BlockStepKind.Store or BlockStepKind.Send or BlockStepKind.While or BlockStepKind.VrchatParam or BlockStepKind.VrchatInput or BlockStepKind.VrchatChat or BlockStepKind.VrchatTyping;
+        _stepPayloadComboBox.Enabled = hasStep && kind == BlockStepKind.Send;
+        _stepExtraTextBox.Enabled = hasStep && kind is BlockStepKind.Send or BlockStepKind.VrchatChat;
+    }
+
+    private void UpdateSelectedRuleFromEditor()
+    {
+        if (_suppressBlockEvents || _rulesListBox.SelectedItem is not BlockRule rule)
+        {
+            return;
+        }
+
+        rule.Trigger = _triggerComboBox.SelectedValue is BlockTriggerKind trigger ? trigger : BlockTriggerKind.Startup;
+        rule.EndpointName = _ruleEndpointTextBox.Text;
+        rule.Address = _ruleAddressTextBox.Text;
+        rule.WhenExpression = _ruleWhenTextBox.Text;
+        RefreshRuleDisplay();
+        UpdateBlocksPreview();
+    }
+
+    private void UpdateSelectedStepFromEditor()
+    {
+        if (_suppressBlockEvents || SelectedStep is not BlockStep step)
+        {
+            return;
+        }
+
+        var previousKind = step.Kind;
+        step.Kind = _stepKindComboBox.SelectedValue is BlockStepKind kind ? kind : step.Kind;
+        step.Target = _stepTargetTextBox.Text;
+        step.Value = _stepValueTextBox.Text;
+        step.PayloadMode = _stepPayloadComboBox.SelectedValue is BlockPayloadMode payloadMode ? payloadMode : BlockPayloadMode.None;
+        step.Extra = _stepExtraTextBox.Text;
+
+        if (step.Kind != BlockStepKind.Send)
+        {
+            step.PayloadMode = BlockPayloadMode.None;
+        }
+
+        if (step.Kind is BlockStepKind.Stop or BlockStepKind.Break or BlockStepKind.Continue)
+        {
+            step.Target = string.Empty;
+            step.Value = string.Empty;
+            step.Extra = string.Empty;
+        }
+
+        if (step.Kind == BlockStepKind.While)
+        {
+            step.Target = string.Empty;
+            step.PayloadMode = BlockPayloadMode.None;
+            step.Extra = string.Empty;
+            if (previousKind != BlockStepKind.While && step.Children.Count == 0)
+            {
+                step.Children.Add(new BlockStep { Kind = BlockStepKind.Break });
+            }
+        }
+
+        if (step.Kind != BlockStepKind.While && previousKind == BlockStepKind.While)
+        {
+            step.Children.Clear();
+        }
+
+        if (step.Kind != BlockStepKind.VrchatChat && step.Kind != BlockStepKind.Send)
+        {
+            step.Extra = string.Empty;
+        }
+
+        ApplyStepEditorState(step.Kind);
+        RefreshStepDisplay();
+        RefreshRuleDisplay();
+        UpdateStepNavigationButtons();
+        UpdateStepHint();
+        UpdateBlocksPreview();
+    }
+
+    private void SelectStep(BlockStep step)
+    {
+        _stepsListBox.SelectedItem = step;
+        BindSelectedStep();
+    }
+
+    private void RefreshRuleDisplay()
+    {
+        _ruleBindingSource.ResetBindings(false);
+        _rulesListBox.Refresh();
+    }
+
+    private void RefreshStepDisplay()
+    {
+        if (CurrentStepContainer is not null)
+        {
+            _stepBindingSource.DataSource = CurrentStepContainer;
+            _stepsListBox.DataSource = _stepBindingSource;
+        }
+
+        _stepBindingSource.ResetBindings(false);
+        _stepsListBox.Refresh();
+        UpdateStepNavigationButtons();
+    }
+
+    private void UpdateBlocksPreview()
+    {
+        _blocksPreviewTextBox.Text = OSCControlScriptGenerator.Generate(_blocks);
+    }
+
+    private void ApplyBlocksToScript()
+    {
+        UpdateBlocksPreview();
+        _editorTextBox.Text = _blocksPreviewTextBox.Text;
+        _editorTabs.SelectedTab = _scriptTab;
+        UpdateStatus(L("�ѽ����ɽű�Ӧ�õ��ű�ҳ��", "Applied generated script to the Script tab."));
+    }
+
+    private void InitializeBlockSplitters()
+    {
+        if (_blockSplittersInitialized)
+        {
+            return;
+        }
+
+        if (!TryInitializeHorizontalSplit(_blocksOuterSplit, 120, 220, 150))
+        {
+            return;
+        }
+
+        if (!TryInitializeHorizontalSplit(_blocksInnerSplit, 220, 120, 430))
+        {
+            return;
+        }
+
+        if (!TryInitializeVerticalSplit(_blocksRuleSplit, 320, 420, 440))
+        {
+            return;
+        }
+
+        _blockSplittersInitialized = true;
+    }
+
+    private static bool TryInitializeHorizontalSplit(SplitContainer split, int panel1Min, int panel2Min, int preferredDistance)
+    {
+        if (split.Height <= 0)
+        {
+            return false;
+        }
+
+        var available = split.Height - split.SplitterWidth;
+        if (available <= 0)
+        {
+            return false;
+        }
+
+        if (available < panel1Min + panel2Min)
+        {
+            split.Panel1MinSize = 0;
+            split.Panel2MinSize = 0;
+            split.SplitterDistance = Math.Max(0, available / 2);
+            return true;
+        }
+
+        split.Panel1MinSize = panel1Min;
+        split.Panel2MinSize = panel2Min;
+        var maxDistance = split.Height - panel2Min - split.SplitterWidth;
+        split.SplitterDistance = Math.Max(panel1Min, Math.Min(preferredDistance, maxDistance));
+        return true;
+    }
+
+    private static bool TryInitializeVerticalSplit(SplitContainer split, int panel1Min, int panel2Min, int preferredDistance)
+    {
+        if (split.Width <= 0)
+        {
+            return false;
+        }
+
+        var available = split.Width - split.SplitterWidth;
+        if (available <= 0)
+        {
+            return false;
+        }
+
+        if (available < panel1Min + panel2Min)
+        {
+            split.Panel1MinSize = 0;
+            split.Panel2MinSize = 0;
+            split.SplitterDistance = Math.Max(0, available / 2);
+            return true;
+        }
+
+        split.Panel1MinSize = panel1Min;
+        split.Panel2MinSize = panel2Min;
+        var maxDistance = split.Width - panel2Min - split.SplitterWidth;
+        split.SplitterDistance = Math.Max(panel1Min, Math.Min(preferredDistance, maxDistance));
+        return true;
+    }
+
+    private void ImportScriptToBlocks()
+    {
+        var result = _controller.Compile(_editorTextBox.Text);
+        RenderDiagnostics(result);
+        if (result.HasErrors)
+        {
+            UpdateStatus(L("���뵽��ľǰ�����޸��ű�������⡣", "Fix script diagnostics before importing into Blocks."));
+            return;
+        }
+
+        var imported = BlockDocumentImporter.Import(result);
+        LoadBlocksDocument(imported.Document);
+        _editorTabs.SelectedTab = _blocksTab;
+        UpdateBlocksPreview();
+
+        if (imported.Warnings.Count == 0)
+        {
+            UpdateStatus(L("�ѽ��ű����뵽��ľ��", "Imported script into Blocks."));
+            return;
+        }
+
+        AppendRuntimeOutput(L("��ľ����˵����", "Block import notes:"));
+        foreach (var warning in imported.Warnings)
+        {
+            AppendRuntimeOutput($"- {warning}");
+        }
+
+        UpdateStatus(_useSimplifiedChinese ? $"�ѵ��룬������ {imported.Warnings.Count} ��˵����" : $"Imported with {imported.Warnings.Count} note(s).");
+    }
+
+    private void LoadBlocksDocument(BlockDocument document)
+    {
+        _suppressBlockEvents = true;
+        try
+        {
+            _blocks.Endpoints.Clear();
+            foreach (var endpoint in document.Endpoints)
+            {
+                _blocks.Endpoints.Add(CloneEndpoint(endpoint));
+            }
+
+            _blocks.Rules.Clear();
+            foreach (var rule in document.Rules)
+            {
+                _blocks.Rules.Add(CloneRule(rule));
+            }
+
+            _endpointBindingSource.ResetBindings(false);
+            RefreshRuleDisplay();
+            _rulesListBox.ClearSelected();
+            if (_blocks.Rules.Count > 0)
+            {
+                _rulesListBox.SelectedItem = _blocks.Rules[0];
+            }
+        }
+        finally
+        {
+            _suppressBlockEvents = false;
+        }
+
+        BindSelectedRule();
+    }
+    private static BlockEndpoint CloneEndpoint(BlockEndpoint source) => new()
+    {
+        Name = source.Name,
+        Transport = source.Transport,
+        Mode = source.Mode,
+        Host = source.Host,
+        Port = source.Port,
+        InputPort = source.InputPort,
+        Path = source.Path,
+        Codec = source.Codec,
+    };
+
+    private void DrawRuleItem(object? sender, DrawItemEventArgs e)
+    {
+        e.DrawBackground();
+        if (e.Index < 0 || e.Index >= _rulesListBox.Items.Count)
+        {
+            return;
+        }
+
+        var rule = (BlockRule)_rulesListBox.Items[e.Index]!;
+        var selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+        var baseColor = rule.Trigger switch
+        {
+            BlockTriggerKind.Startup => Color.FromArgb(255, 241, 204),
+            BlockTriggerKind.Receive => Color.FromArgb(217, 234, 253),
+            BlockTriggerKind.VrchatAvatarChange => Color.FromArgb(244, 222, 255),
+            BlockTriggerKind.VrchatParameter => Color.FromArgb(225, 239, 223),
+            _ => Color.White,
+        };
+        var fillColor = selected ? Color.FromArgb(56, 112, 214) : baseColor;
+        var titleColor = selected ? Color.White : Color.FromArgb(30, 30, 30);
+        var bodyColor = selected ? Color.FromArgb(235, 242, 255) : Color.FromArgb(70, 70, 70);
+        using var background = new SolidBrush(fillColor);
+        using var borderPen = new Pen(selected ? Color.FromArgb(24, 76, 176) : Color.FromArgb(180, 180, 180));
+
+        var bounds = new Rectangle(e.Bounds.X + 4, e.Bounds.Y + 4, Math.Max(0, e.Bounds.Width - 8), Math.Max(0, e.Bounds.Height - 8));
+        e.Graphics.FillRectangle(background, bounds);
+        e.Graphics.DrawRectangle(borderPen, bounds);
+
+        var title = rule.Trigger switch
+        {
+            BlockTriggerKind.Startup => L("��Ӧ�����ʱ", "When app starts"),
+            BlockTriggerKind.Receive => _useSimplifiedChinese ? $"���� {FormatDisplayValue(rule.EndpointName, "�˵�")} ���յ���Ϣʱ" : $"When receive from {FormatDisplayValue(rule.EndpointName, "endpoint")}",
+            BlockTriggerKind.VrchatAvatarChange => L("�� VRChat ģ���л�ʱ", "When VRChat avatar changes"),
+            BlockTriggerKind.VrchatParameter => _useSimplifiedChinese ? $"�� VRChat ���� {FormatDisplayValue(rule.EndpointName, "����")} �仯ʱ" : $"When VRChat param {FormatDisplayValue(rule.EndpointName, "param")} changes",
+            _ => L("����", "Rule"),
+        };
+
+        var detail = rule.Trigger switch
+        {
+            BlockTriggerKind.Receive when string.IsNullOrWhiteSpace(rule.Address) => (string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("�޹�������", "No filter") : rule.WhenExpression),
+            BlockTriggerKind.Receive => (_useSimplifiedChinese ? $"��ַ {rule.Address}" : $"Address {rule.Address}") + (string.IsNullOrWhiteSpace(rule.WhenExpression) ? string.Empty : (_useSimplifiedChinese ? $" �� {rule.WhenExpression}" : $" and {rule.WhenExpression}")),
+            BlockTriggerKind.VrchatAvatarChange => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("���� /avatar/change", "Listening to /avatar/change") : rule.WhenExpression,
+            BlockTriggerKind.VrchatParameter => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("���� /avatar/parameters/...", "Listening to /avatar/parameters/...") : rule.WhenExpression,
+            _ => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("�޹�������", "No filter") : rule.WhenExpression,
+        };
+        var steps = rule.Steps.Count == 0 ? L("��û�в���", "No steps yet") : (_useSimplifiedChinese ? $"{rule.Steps.Count} ��" : $"{rule.Steps.Count} step(s)");
+
+        TextRenderer.DrawText(e.Graphics, title, Font, new Rectangle(bounds.X + 10, bounds.Y + 8, bounds.Width - 20, 18), titleColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics, detail, Font, new Rectangle(bounds.X + 10, bounds.Y + 28, bounds.Width - 20, 16), bodyColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics, steps, Font, new Rectangle(bounds.X + 10, bounds.Y + 44, bounds.Width - 20, 14), bodyColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        e.DrawFocusRectangle();
+    }
+
+    private void DrawStepItem(object? sender, DrawItemEventArgs e)
+    {
+        e.DrawBackground();
+        if (e.Index < 0 || e.Index >= _stepsListBox.Items.Count)
+        {
+            return;
+        }
+
+        var step = (BlockStep)_stepsListBox.Items[e.Index]!;
+        var selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+        var baseColor = step.Kind switch
+        {
+            BlockStepKind.Log => Color.FromArgb(229, 243, 255),
+            BlockStepKind.Store => Color.FromArgb(232, 246, 230),
+            BlockStepKind.Send => Color.FromArgb(255, 236, 214),
+            BlockStepKind.While => Color.FromArgb(248, 233, 255),
+            BlockStepKind.Break => Color.FromArgb(255, 229, 229),
+            BlockStepKind.Continue => Color.FromArgb(232, 248, 255),
+            BlockStepKind.Stop => Color.FromArgb(250, 224, 224),
+            BlockStepKind.VrchatParam => Color.FromArgb(243, 226, 255),
+            BlockStepKind.VrchatInput => Color.FromArgb(225, 238, 255),
+            BlockStepKind.VrchatChat => Color.FromArgb(255, 230, 242),
+            BlockStepKind.VrchatTyping => Color.FromArgb(231, 255, 240),
+            _ => Color.White,
+        };
+        var fillColor = selected ? Color.FromArgb(56, 112, 214) : baseColor;
+        var titleColor = selected ? Color.White : Color.FromArgb(30, 30, 30);
+        var bodyColor = selected ? Color.FromArgb(235, 242, 255) : Color.FromArgb(75, 75, 75);
+        using var background = new SolidBrush(fillColor);
+        using var borderPen = new Pen(selected ? Color.FromArgb(24, 76, 176) : Color.FromArgb(185, 185, 185));
+
+        var bounds = new Rectangle(e.Bounds.X + 4, e.Bounds.Y + 4, Math.Max(0, e.Bounds.Width - 8), Math.Max(0, e.Bounds.Height - 8));
+        e.Graphics.FillRectangle(background, bounds);
+        e.Graphics.DrawRectangle(borderPen, bounds);
+
+        var title = step.Kind switch
+        {
+            BlockStepKind.Log => _useSimplifiedChinese ? $"日志 {FormatDisplayValue(step.Target, "info")}" : $"Log {FormatDisplayValue(step.Target, "info")}",
+            BlockStepKind.Store => _useSimplifiedChinese ? $"存储 {FormatDisplayValue(step.Target, "状态")}" : $"Store {FormatDisplayValue(step.Target, "state")}",
+            BlockStepKind.Send => _useSimplifiedChinese ? $"发送 {FormatDisplayValue(step.Target, "端点")}" : $"Send {FormatDisplayValue(step.Target, "endpoint")}",
+            BlockStepKind.While => L("循环", "While"),
+            BlockStepKind.Break => L("跳出循环", "Break"),
+            BlockStepKind.Continue => L("继续下一轮", "Continue"),
+            BlockStepKind.Stop => L("停止链", "Stop chain"),
+            BlockStepKind.VrchatParam => _useSimplifiedChinese ? $"VRChat 参数 {FormatDisplayValue(step.Target, "参数")}" : $"VRChat param {FormatDisplayValue(step.Target, "param")}",
+            BlockStepKind.VrchatInput => _useSimplifiedChinese ? $"VRChat 输入 {FormatDisplayValue(step.Target, "输入")}" : $"VRChat input {FormatDisplayValue(step.Target, "input")}",
+            BlockStepKind.VrchatChat => L("VRChat 聊天框", "VRChat Chatbox"),
+            BlockStepKind.VrchatTyping => L("VRChat 正在输入", "VRChat Typing"),
+            _ => step.Kind.ToString(),
+        };
+        var detail = step.Kind switch
+        {
+            BlockStepKind.Log => FormatDisplayValue(step.Value, L("消息", "message")),
+            BlockStepKind.Store => FormatDisplayValue(step.Value, L("表达式", "expression")),
+            BlockStepKind.Send => $"{FormatDisplayValue(step.Value, "/address")} | {FormatPayloadMode(step.PayloadMode)} | {FormatDisplayValue(step.Extra, L("负载", "payload"))}",
+            BlockStepKind.While => _useSimplifiedChinese ? $"条件 {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} 个子步骤" : $"Condition {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} child step(s)",
+            BlockStepKind.Break => L("立刻跳出当前循环", "Exit the current loop immediately"),
+            BlockStepKind.Continue => L("跳到当前循环的下一轮", "Skip to the next loop iteration"),
+            BlockStepKind.Stop => L("立即结束当前规则链", "End current rule chain immediately"),
+            BlockStepKind.VrchatParam => FormatDisplayValue(step.Value, "0"),
+            BlockStepKind.VrchatInput => FormatDisplayValue(step.Value, "1"),
+            BlockStepKind.VrchatChat => string.IsNullOrWhiteSpace(step.Extra) ? FormatDisplayValue(step.Value, L("聊天文本", "chat text")) : $"{FormatDisplayValue(step.Value, L("聊天文本", "chat text"))} | {step.Extra}",
+            BlockStepKind.VrchatTyping => FormatDisplayValue(step.Value, "true"),
+            _ => string.Empty,
+        };
+
+        TextRenderer.DrawText(e.Graphics, title, Font, new Rectangle(bounds.X + 10, bounds.Y + 8, bounds.Width - 20, 18), titleColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics, detail, Font, new Rectangle(bounds.X + 10, bounds.Y + 28, bounds.Width - 20, 16), bodyColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        e.DrawFocusRectangle();
+    }
+
+    private static string FormatDisplayValue(string value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private string GetCurrentSource() => _editorTabs.SelectedTab == _blocksTab ? _blocksPreviewTextBox.Text : _editorTextBox.Text;
+
+    private void UpdateStepHint()
+    {
+        var step = SelectedStep;
+        if (step is null)
+        {
+            _stepHintLabel.Text = L("选择一个步骤后即可编辑。发送步骤使用 目标=端点，值=地址，负载=args/body，附加=负载内容。循环步骤用 值=条件，再通过“进入循环体”编辑子步骤。", "Select a step to edit it. Send steps use Target = endpoint, Value = address, Payload = args/body, Extra = payload content. While steps use Value = condition, then Enter Body to edit child steps.");
+            return;
+        }
+
+        _stepHintLabel.Text = step.Kind switch
+        {
+            BlockStepKind.Log => L("日志：目标 = 日志级别（info/warn/error/debug），值 = 文本或表达式。", "Log: Target = log level (info/warn/error/debug), Value = text or expression."),
+            BlockStepKind.Store => L("存储：目标 = 状态名，值 = 事件之间需要保留的表达式。", "Store: Target = state name, Value = expression to keep between events."),
+            BlockStepKind.Send => L("发送：目标 = 端点名，值 = 地址，负载 = Args 或 Body，附加 = 负载内容。对于 args，你可以直接输入 1, 2, 3，生成器会自动包成 [[...]]。", "Send: Target = endpoint name, Value = address, Payload = Args or Body, Extra = payload content. For args you can type 1, 2, 3 and the generator will wrap it into [[...]]."),
+            BlockStepKind.While => L("循环：值 = 条件表达式，例如 state(\"count\") < 3。选中后点“进入循环体”来编辑子步骤。", "While: Value = condition expression, for example state(\"count\") < 3. Select it and click Enter Body to edit child steps."),
+            BlockStepKind.Break => L("跳出循环：立即结束当前 while。其他字段会被忽略。", "Break: exits the current while immediately. Other fields are ignored."),
+            BlockStepKind.Continue => L("继续下一轮：跳过当前循环余下步骤，进入下一轮。其他字段会被忽略。", "Continue: skips the rest of the current loop iteration. Other fields are ignored."),
+            BlockStepKind.Stop => L("停止：立即结束当前规则链。其他字段会被忽略。", "Stop: ends the current rule chain immediately. Other fields are ignored."),
+            BlockStepKind.VrchatParam => L("VRChat 参数：目标 = Avatar 参数名，值 = 要写入的值。会生成 vrchat.param。", "VRChat Param: Target = avatar parameter name, Value = value to write. Generates vrchat.param."),
+            BlockStepKind.VrchatInput => L("VRChat 输入：目标 = 输入名，例如 Jump / Vertical，值 = 要发送的值。", "VRChat Input: Target = input name such as Jump / Vertical, Value = value to send."),
+            BlockStepKind.VrchatChat => L("VRChat 聊天框：值 = 文本，附加 = 例如 send=true notify=false。", "VRChat Chatbox: Value = text, Extra = options like send=true notify=false."),
+            BlockStepKind.VrchatTyping => L("VRChat 正在输入：值 = true 或 false。", "VRChat Typing: Value = true or false."),
+            _ => L("编辑当前选中的步骤。", "Edit the selected step.")
+        };
+    }
+
+    private void EnterSelectedStepBody()
+    {
+        if (SelectedStep is not { IsContainer: true } step)
+        {
+            return;
+        }
+
+        _stepContainerStack.Push(new StepContainerContext(step.Children, step));
+        _stepBindingSource.DataSource = step.Children;
+        _stepsListBox.DataSource = _stepBindingSource;
+        RefreshStepDisplay();
+        if (step.Children.Count > 0)
+        {
+            SelectStep(step.Children[0]);
+        }
+        else
+        {
+            BindSelectedStep();
+        }
+    }
+
+    private void ExitStepBody()
+    {
+        if (IsAtRootStepContainer || _stepContainerStack.Count == 0)
+        {
+            return;
+        }
+
+        var previous = _stepContainerStack.Pop();
+        var parent = _stepContainerStack.Peek();
+        _stepBindingSource.DataSource = parent.Steps;
+        _stepsListBox.DataSource = _stepBindingSource;
+        RefreshStepDisplay();
+
+        if (previous.Owner is not null)
+        {
+            SelectStep(previous.Owner);
+        }
+        else if (parent.Steps.Count > 0)
+        {
+            SelectStep(parent.Steps[0]);
+        }
+        else
+        {
+            BindSelectedStep();
+        }
+    }
+
+    private void ResetToRuleStepContainer(BlockRule rule)
+    {
+        _stepContainerStack.Clear();
+        _stepContainerStack.Push(new StepContainerContext(rule.Steps, null));
+        _stepBindingSource.DataSource = rule.Steps;
+        _stepsListBox.DataSource = _stepBindingSource;
+        RefreshStepDisplay();
+    }
+
+    private void UpdateStepNavigationButtons()
+    {
+        _stepEnterBodyButton.Enabled = SelectedStep?.IsContainer == true;
+        _stepBackButton.Enabled = !IsAtRootStepContainer;
+    }
+
+    private static void CommitGridEdit(DataGridView grid)
+    {
+        if (grid.IsCurrentCellDirty)
+        {
+            grid.CommitEdit(DataGridViewDataErrorContexts.Commit);
+        }
+    }
+
+    private void PostToUi(Action action)
+    {
+        if (IsDisposed || !IsHandleCreated)
+        {
+            return;
+        }
+
+        if (InvokeRequired)
+        {
+            BeginInvoke(action);
+            return;
+        }
+
+        action();
+    }
+
+    private sealed class OptionItem<T>
+    {
+        public OptionItem(T value, string label)
+        {
+            Value = value;
+            Label = label;
+        }
+
+        public T Value { get; }
+
+        public string Label { get; }
+    }
+    private async Task SetBusyAsync(bool busy)
+    {
+        SetEditingEnabled(!busy);
+        await Task.Yield();
+    }
+
+    private void SetEditingEnabled(bool enabled)
+    {
+        _pathTextBox.Enabled = enabled;
+        _editorTabs.Enabled = enabled;
+        _editorTextBox.Enabled = enabled;
+        _blocksEditorRoot.Enabled = enabled;
+        _reloadButton.Enabled = enabled;
+        _saveButton.Enabled = enabled;
+        _checkButton.Enabled = enabled;
+        _startButton.Enabled = enabled && !_controller.IsRunning;
+        _stopButton.Enabled = enabled && _controller.IsRunning;
+    }
+
+    private void ResetBottomSplit()
+    {
+        InitializeBlockSplitters();
+    }
+
+    private sealed record StepContainerContext(BindingList<BlockStep> Steps, BlockStep? Owner);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

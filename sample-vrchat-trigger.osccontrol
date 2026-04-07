@@ -1,0 +1,3 @@
+on vrchat.param GestureLeft [
+    log info arg(0)
+]

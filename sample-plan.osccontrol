@@ -1,0 +1,14 @@
+endpoint oscIn: osc.udp {
+    mode: input
+    host: "127.0.0.1"
+    port: 9000
+    codec: osc
+}
+
+state lastNote = 0
+
+on receive oscIn when msg.body.value == 1 [
+    send oscIn {
+        args: [[1, 2, 3]]
+    }
+]
