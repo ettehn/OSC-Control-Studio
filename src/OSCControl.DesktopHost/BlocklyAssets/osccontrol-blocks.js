@@ -13,7 +13,8 @@
         { "type": "field_input", "name": "HOST", "text": "127.0.0.1" },
         { "type": "field_number", "name": "PORT", "value": 9000, "min": 1, "max": 65535, "precision": 1 }
       ],
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 230,
       "tooltip": "Declare an OSC UDP endpoint.",
       "helpUrl": ""
@@ -30,7 +31,8 @@
         { "type": "field_input", "name": "PATH", "text": "/osc" },
         { "type": "field_input", "name": "CODEC", "text": "json" }
       ],
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 230,
       "tooltip": "Declare a WebSocket endpoint.",
       "helpUrl": ""
@@ -46,7 +48,8 @@
         { "type": "field_input", "name": "PATH", "text": "/control" },
         { "type": "field_dropdown", "name": "CODEC", "options": [["json", "json"], ["text", "text"], ["bytes", "bytes"]] }
       ],
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 230,
       "tooltip": "Declare a WebSocket client endpoint. Duplex mode receives from and sends to the remote server on the same connection.",
       "helpUrl": ""
@@ -62,7 +65,8 @@
         { "type": "field_input", "name": "PATH", "text": "/control" },
         { "type": "field_dropdown", "name": "CODEC", "options": [["json", "json"], ["text", "text"], ["bytes", "bytes"]] }
       ],
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 230,
       "tooltip": "Declare a WebSocket server endpoint. Duplex mode receives client messages and broadcasts sends to connected clients.",
       "helpUrl": ""
@@ -75,7 +79,8 @@
         { "type": "field_number", "name": "INPUT_PORT", "value": 9000, "min": 1, "max": 65535, "precision": 1 },
         { "type": "field_number", "name": "OUTPUT_PORT", "value": 9001, "min": 1, "max": 65535, "precision": 1 }
       ],
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 230,
       "tooltip": "Declare a VRChat OSC endpoint.",
       "helpUrl": ""
@@ -87,8 +92,8 @@
         { "type": "field_input", "name": "NAME", "text": "count" },
         { "type": "field_input", "name": "VALUE", "text": "0" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 300,
       "tooltip": "Declare a top-level state variable.",
       "helpUrl": ""
@@ -100,8 +105,8 @@
         { "type": "field_input", "name": "NAME", "text": "count" },
         { "type": "input_value", "name": "VALUE" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 300,
       "tooltip": "Declare a top-level state variable from an expression.",
       "helpUrl": ""
@@ -111,10 +116,10 @@
       "message0": "when app starts %1 %2",
       "args0": [
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "STACK" }
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 190,
       "tooltip": "Run steps when the app starts.",
       "helpUrl": ""
@@ -126,10 +131,10 @@
         { "type": "field_input", "name": "ENDPOINT", "text": "oscIn" },
         { "type": "field_input", "name": "ADDRESS", "text": "/example" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "STACK" }
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 190,
       "tooltip": "Run steps when an endpoint receives a matching OSC address.",
       "helpUrl": ""
@@ -142,10 +147,10 @@
         { "type": "field_input", "name": "ADDRESS", "text": "/example" },
         { "type": "field_input", "name": "CONDITION", "text": "arg(0) > 0" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "STACK" }
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 190,
       "tooltip": "Run steps when an endpoint receives a matching address and condition.",
       "helpUrl": ""
@@ -157,10 +162,10 @@
         { "type": "field_input", "name": "ENDPOINT", "text": "wsServer" },
         { "type": "field_input", "name": "ADDRESS", "text": "/ping" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "STACK" }
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 190,
       "tooltip": "Run steps when a WebSocket endpoint receives a JSON envelope with the matching address.",
       "helpUrl": ""
@@ -173,10 +178,10 @@
         { "type": "field_input", "name": "ADDRESS", "text": "/ping" },
         { "type": "field_input", "name": "CONDITION", "text": "body(\"value\") > 0" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "STACK" }
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 190,
       "tooltip": "Run steps when a WebSocket endpoint receives a matching address and condition.",
       "helpUrl": ""
@@ -186,10 +191,10 @@
       "message0": "when VRChat avatar changes %1 %2",
       "args0": [
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "STACK" }
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 190,
       "tooltip": "Run steps when VRChat reports an avatar change.",
       "helpUrl": ""
@@ -200,10 +205,10 @@
       "args0": [
         { "type": "field_dropdown", "name": "PARAM", "options": [["GestureLeft", "GestureLeft"], ["GestureRight", "GestureRight"], ["GestureLeftWeight", "GestureLeftWeight"], ["GestureRightWeight", "GestureRightWeight"], ["VelocityMagnitude", "VelocityMagnitude"], ["VelocityX", "VelocityX"], ["VelocityY", "VelocityY"], ["VelocityZ", "VelocityZ"], ["Upright", "Upright"], ["Grounded", "Grounded"], ["Seated", "Seated"], ["AFK", "AFK"], ["TrackingType", "TrackingType"], ["VRMode", "VRMode"], ["MuteSelf", "MuteSelf"], ["InStation", "InStation"], ["Earmuffs", "Earmuffs"], ["Viseme", "Viseme"], ["Voice", "Voice"], ["AngularY", "AngularY"], ["IsLocal", "IsLocal"], ["PreviewMode", "PreviewMode"], ["AvatarVersion", "AvatarVersion"], ["IsAnimatorEnabled", "IsAnimatorEnabled"], ["ScaleModified", "ScaleModified"], ["ScaleFactor", "ScaleFactor"], ["ScaleFactorInverse", "ScaleFactorInverse"], ["EyeHeightAsMeters", "EyeHeightAsMeters"], ["EyeHeightAsPercent", "EyeHeightAsPercent"], ["IsOnFriendsList", "IsOnFriendsList"]] },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "STACK" }
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 190,
       "tooltip": "Listen to a VRChat built-in avatar parameter. Built-in parameters are read-only in VRChat and cannot be written by OSCControl.",
       "helpUrl": "https://creators.vrchat.com/avatars/animator-parameters/"
@@ -214,10 +219,10 @@
       "args0": [
         { "type": "field_input", "name": "PARAM", "text": "CustomParam" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "STACK" }
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
       "colour": 190,
       "tooltip": "Run steps when a custom VRChat avatar parameter changes. For built-in read-only parameters, prefer the dedicated built-in parameter block.",
       "helpUrl": ""
@@ -229,8 +234,8 @@
         { "type": "field_dropdown", "name": "LEVEL", "options": [["info", "info"], ["warn", "warn"], ["error", "error"]] },
         { "type": "field_input", "name": "VALUE", "text": "\"ready\"" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 60,
       "tooltip": "Write a runtime log entry. This field is raw DSL: type count to reference a variable, or \"ready\" for a string literal.",
       "helpUrl": ""
@@ -242,8 +247,8 @@
         { "type": "field_input", "name": "NAME", "text": "count" },
         { "type": "field_input", "name": "VALUE", "text": "count + 1" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 60,
       "tooltip": "Update a state variable.",
       "helpUrl": ""
@@ -256,8 +261,8 @@
         { "type": "field_input", "name": "ADDRESS", "text": "/hello" },
         { "type": "field_input", "name": "ARGS", "text": "[[1]]" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Send an OSC args payload.",
       "helpUrl": ""
@@ -270,8 +275,8 @@
         { "type": "field_input", "name": "ADDRESS", "text": "/hello" },
         { "type": "field_input", "name": "BODY", "text": "{value: arg(0)}" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Send a message body to an endpoint.",
       "helpUrl": ""
@@ -284,8 +289,8 @@
         { "type": "field_input", "name": "ADDRESS", "text": "/pong" },
         { "type": "field_input", "name": "BODY", "text": "{value: arg(0)}" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Send a JSON WebSocket envelope. With ws.server, this broadcasts to connected clients; with ws.client, it sends to the remote server.",
       "helpUrl": ""
@@ -297,8 +302,8 @@
         { "type": "field_input", "name": "TARGET", "text": "wsClient" },
         { "type": "field_input", "name": "TEXT", "text": "\"hello\"" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Send a WebSocket body. This field is raw DSL: type count to reference a variable, or \"hello\" for a string literal. Use codec text for raw text payloads.",
       "helpUrl": ""
@@ -311,8 +316,8 @@
         { "type": "field_input", "name": "ADDRESS", "text": "/pong" },
         { "type": "input_value", "name": "BODY" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Send a JSON WebSocket envelope with an expression body.",
       "helpUrl": ""
@@ -323,10 +328,10 @@
       "args0": [
         { "type": "field_input", "name": "CONDITION", "text": "arg(0) > 0" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "THEN" }
+        { "type": "input_statement", "name": "THEN", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Run nested steps when a condition is true.",
       "helpUrl": ""
@@ -337,11 +342,11 @@
       "args0": [
         { "type": "field_input", "name": "CONDITION", "text": "arg(0) > 0" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "THEN" },
-        { "type": "input_statement", "name": "ELSE" }
+        { "type": "input_statement", "name": "THEN", "check": "Step" },
+        { "type": "input_statement", "name": "ELSE", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Run one of two nested step lists based on a condition.",
       "helpUrl": ""
@@ -352,10 +357,10 @@
       "args0": [
         { "type": "field_input", "name": "CONDITION", "text": "count < 3" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "DO" }
+        { "type": "input_statement", "name": "DO", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Repeat nested steps while a condition is true.",
       "helpUrl": ""
@@ -363,8 +368,8 @@
     {
       "type": "osc_stop",
       "message0": "stop rule",
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Stop the current rule.",
       "helpUrl": ""
@@ -372,8 +377,8 @@
     {
       "type": "osc_break",
       "message0": "break loop",
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Break out of the current loop.",
       "helpUrl": ""
@@ -381,8 +386,8 @@
     {
       "type": "osc_continue",
       "message0": "continue loop",
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Continue the current loop.",
       "helpUrl": ""
@@ -395,8 +400,8 @@
         { "type": "field_checkbox", "name": "SEND", "checked": true },
         { "type": "field_checkbox", "name": "NOTIFY", "checked": false }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Send text or an expression to the VRChat chatbox. This field is raw DSL: type count to reference a variable, or \"hello\" for a string literal.",
       "helpUrl": ""
@@ -408,8 +413,8 @@
         { "type": "field_input", "name": "INPUT", "text": "Jump" },
         { "type": "field_input", "name": "VALUE", "text": "1" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Set a VRChat input value.",
       "helpUrl": ""
@@ -421,8 +426,8 @@
         { "type": "field_input", "name": "PARAM", "text": "CustomParam" },
         { "type": "field_input", "name": "VALUE", "text": "0" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Set a custom VRChat avatar parameter. VRChat built-in avatar parameters such as GestureLeft and VelocityZ are read-only.",
       "helpUrl": ""
@@ -433,8 +438,8 @@
       "args0": [
         { "type": "field_dropdown", "name": "VALUE", "options": [["true", "true"], ["false", "false"]] }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Set VRChat chatbox typing state.",
       "helpUrl": ""
@@ -445,8 +450,8 @@
       "args0": [
         { "type": "field_input", "name": "SOURCE", "text": "stop" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 0,
       "tooltip": "Emit a raw OSCControl statement while the Blockly mapping is incomplete.",
       "helpUrl": ""
@@ -618,8 +623,8 @@
         { "type": "field_dropdown", "name": "LEVEL", "options": [["info", "info"], ["warn", "warn"], ["error", "error"]] },
         { "type": "input_value", "name": "VALUE" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 60,
       "tooltip": "Write a runtime log entry from an expression.",
       "helpUrl": ""
@@ -631,8 +636,8 @@
         { "type": "field_input", "name": "NAME", "text": "count" },
         { "type": "input_value", "name": "VALUE" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 60,
       "tooltip": "Update a state variable from an expression.",
       "helpUrl": ""
@@ -643,10 +648,10 @@
       "args0": [
         { "type": "input_value", "name": "CONDITION" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "THEN" }
+        { "type": "input_statement", "name": "THEN", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Run nested steps when an expression is true.",
       "helpUrl": ""
@@ -657,11 +662,11 @@
       "args0": [
         { "type": "input_value", "name": "CONDITION" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "THEN" },
-        { "type": "input_statement", "name": "ELSE" }
+        { "type": "input_statement", "name": "THEN", "check": "Step" },
+        { "type": "input_statement", "name": "ELSE", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Run one of two nested step lists based on an expression.",
       "helpUrl": ""
@@ -672,10 +677,10 @@
       "args0": [
         { "type": "input_value", "name": "CONDITION" },
         { "type": "input_dummy" },
-        { "type": "input_statement", "name": "DO" }
+        { "type": "input_statement", "name": "DO", "check": "Step" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 120,
       "tooltip": "Repeat nested steps while an expression is true.",
       "helpUrl": ""
@@ -687,8 +692,8 @@
         { "type": "field_input", "name": "INPUT", "text": "Jump" },
         { "type": "input_value", "name": "VALUE" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Set a VRChat input from an expression.",
       "helpUrl": ""
@@ -700,8 +705,8 @@
         { "type": "field_input", "name": "PARAM", "text": "CustomParam" },
         { "type": "input_value", "name": "VALUE" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Set a custom VRChat avatar parameter from an expression. VRChat built-in avatar parameters are read-only.",
       "helpUrl": ""
@@ -712,8 +717,8 @@
       "args0": [
         { "type": "input_value", "name": "VALUE" }
       ],
-      "previousStatement": null,
-      "nextStatement": null,
+      "previousStatement": "Step",
+      "nextStatement": "Step",
       "colour": 30,
       "tooltip": "Set VRChat chatbox typing state from an expression.",
       "helpUrl": ""
