@@ -1,0 +1,7 @@
+﻿{
+    "name":  "OSC Control Studio",
+    "version":  "0.1.0-local-20260407",
+    "kind":  "desktop-studio",
+    "description":  "OSCControl DesktopHost release package with Blockly editor enabled.",
+    "generatedAt":  "2026-04-07T22:39:55.5727230+08:00"
+}

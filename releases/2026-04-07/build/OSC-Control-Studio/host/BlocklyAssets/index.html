@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OSCControl Blockly Editor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="title-block">
+      <strong>OSCControl Blockly Editor</strong>
+      <span id="status">Loading Blockly...</span>
+    </div>
+    <label class="template-picker">
+      Scenario
+      <select id="templateSelect">
+        <option value="startup-log">Startup log</option>
+        <option value="environment-log">Environment log</option>
+        <option value="osc-forward">OSC receive to OSC send</option>
+        <option value="vrchat-chatbox">VRChat startup chatbox</option>
+        <option value="vrchat-param-input">VRChat param to input</option>
+        <option value="stateful-loop">Stateful loop</option>
+        <option value="ws-forward">OSC to WebSocket body</option>
+        <option value="ws-duplex">WebSocket duplex echo</option>
+        <option value="vrchat-avatar-typing">VRChat avatar typing</option>
+      </select>
+    </label>
+    <button id="loadTemplateButton" type="button">Load Scenario</button>
+    <button id="postButton" type="button">Apply To Desktop</button>
+  </header>
+
+  <main class="layout">
+    <section id="blocklyDiv" aria-label="Blockly workspace"></section>
+    <aside class="preview">
+      <h2>Generated .osccontrol</h2>
+      <p id="hostHint">Changes auto-sync to the desktop host when WebView2 is attached. Use Check, Save, or Start in the desktop toolbar.</p>
+      <pre id="scriptPreview"></pre>
+    </aside>
+  </main>
+
+  <xml id="toolbox" style="display:none">
+    <category name="Endpoints" colour="#4f46e5">
+      <block type="osc_endpoint_udp"></block>
+      <block type="osc_endpoint_ws"></block>
+      <block type="ws_client_endpoint"></block>
+      <block type="ws_server_endpoint"></block>
+      <block type="vrchat_endpoint"></block>
+    </category>
+    <category name="Variables" colour="#9333ea">
+      <block type="osc_variable_expr">
+        <value name="VALUE"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
+      </block>
+      <block type="osc_expr_variable"></block>
+      <block type="osc_store"></block>
+      <block type="osc_store_expr">
+        <value name="VALUE">
+          <shadow type="osc_expr_binary">
+            <field name="OP">+</field>
+            <value name="LEFT"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+            <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">1</field></shadow></value>
+          </shadow>
+        </value>
+      </block>
+    </category>
+    <category name="Expressions" colour="#7c3aed">
+      <block type="osc_expr_number"></block>
+      <block type="osc_expr_string"></block>
+      <block type="osc_expr_boolean"></block>
+      <block type="osc_expr_identifier"></block>
+      <block type="osc_expr_variable"></block>
+      <block type="osc_expr_arg"></block>
+      <block type="osc_expr_msg_field"></block>
+      <block type="osc_expr_binary">
+        <value name="LEFT"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+        <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
+      </block>
+      <block type="osc_expr_unary">
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+      </block>
+      <block type="osc_expr_call1">
+        <value name="ARG"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+      </block>
+      <block type="osc_expr_env"></block>
+      <block type="osc_expr_tcp_listening"></block>
+      <block type="osc_expr_env_snapshot"></block>
+      <block type="osc_expr_raw"></block>
+    </category>
+    <category name="Rules" colour="#0891b2">
+      <block type="osc_startup_rule"></block>
+      <block type="osc_receive_rule"></block>
+      <block type="osc_receive_rule_when"></block>
+      <block type="ws_receive_rule"></block>
+      <block type="ws_receive_rule_when"></block>
+      <block type="vrchat_avatar_rule"></block>
+      <block type="vrchat_builtin_param_rule"></block>
+      <block type="vrchat_param_rule"></block>
+    </category>
+    <category name="Actions" colour="#d97706">
+      <block type="osc_log_expr">
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+      </block>
+      <block type="osc_log"></block>
+      <block type="osc_send_simple"></block>
+      <block type="osc_send_body"></block>
+      <block type="ws_send_json"></block>
+      <block type="ws_send_text"></block>
+      <block type="ws_send_json_expr">
+        <value name="BODY"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+      </block>
+    </category>
+    <category name="Control" colour="#16a34a">
+      <block type="osc_if"></block>
+      <block type="osc_if_expr">
+        <value name="CONDITION">
+          <shadow type="osc_expr_binary">
+            <field name="OP">&gt;</field>
+            <value name="LEFT"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+            <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
+          </shadow>
+        </value>
+      </block>
+      <block type="osc_if_else"></block>
+      <block type="osc_if_else_expr">
+        <value name="CONDITION">
+          <shadow type="osc_expr_binary">
+            <field name="OP">==</field>
+            <value name="LEFT"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+            <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">1</field></shadow></value>
+          </shadow>
+        </value>
+      </block>
+      <block type="osc_while"></block>
+      <block type="osc_while_expr">
+        <value name="CONDITION">
+          <shadow type="osc_expr_binary">
+            <field name="OP">&lt;</field>
+            <value name="LEFT"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+            <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">3</field></shadow></value>
+          </shadow>
+        </value>
+      </block>
+      <block type="osc_stop"></block>
+      <block type="osc_break"></block>
+      <block type="osc_continue"></block>
+    </category>
+    <category name="VRChat" colour="#db2777">
+      <block type="vrchat_chat"></block>
+      <block type="vrchat_input"></block>
+      <block type="vrchat_input_expr">
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+      </block>
+      <block type="vrchat_param"></block>
+      <block type="vrchat_param_expr">
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+      </block>
+      <block type="vrchat_typing"></block>
+      <block type="vrchat_typing_expr">
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+      </block>
+    </category>
+    <category name="Raw" colour="#6b7280">
+      <block type="osc_raw_step"></block>
+    </category>
+  </xml>
+
+  <!-- Vendored Blockly runtime files live under vendor/blockly/. Refresh them intentionally when updating Blockly. -->
+  <script src="vendor/blockly/blockly_compressed.js"></script>
+  <script src="vendor/blockly/blocks_compressed.js"></script>
+  <script src="vendor/blockly/msg/en.js"></script>
+  <script src="osccontrol-blocks.js"></script>
+  <script src="osccontrol-generator.js"></script>
+  <script src="osccontrol-editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "oscctlc/1.0.0": {
+        "dependencies": {
+          "OSCControl.Compiler": "1.0.0"
+        },
+        "runtime": {
+          "oscctlc.dll": {}
+        }
+      },
+      "OSCControl.Compiler/1.0.0": {
+        "runtime": {
+          "OSCControl.Compiler.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "oscctlc/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "OSCControl.Compiler/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
