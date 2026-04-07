@@ -32,6 +32,17 @@ powershell -NoProfile -ExecutionPolicy Bypass -File C:\CodexProjects\tools\Build
 The output is a single PowerShell installer script with the packaged app embedded
 as a compressed payload.
 
+## Runtime requirement
+
+Packaged apps are framework-dependent by default. During installation, the
+installer reads `host/*.runtimeconfig.json` from the payload and verifies that the
+required .NET runtime is installed. For the current `OSCControl.AppHost`, this is
+`Microsoft.NETCore.App` 8.x.
+
+If the runtime is missing, the installer stops before modifying the target
+install directory and prints a message that points to the .NET 8 Runtime download
+page.
+
 ## Install
 
 ```powershell

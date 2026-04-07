@@ -45,6 +45,104 @@ function Remove-ChildIfExists {
     Remove-Item -LiteralPath $Path -Recurse -Force
 }
 
+function ConvertTo-RuntimeVersion {
+    param([Parameter(Mandatory = $true)][string] $Version)
+
+    if ($Version -notmatch '^(?<major>\d+)(\.(?<minor>\d+))?(\.(?<build>\d+))?(\.(?<revision>\d+))?') {
+        throw "Unsupported .NET runtime version format: $Version"
+    }
+
+    $minor = if ($Matches.ContainsKey('minor') -and $Matches['minor']) { [int] $Matches['minor'] } else { 0 }
+    $build = if ($Matches.ContainsKey('build') -and $Matches['build']) { [int] $Matches['build'] } else { 0 }
+    $revision = if ($Matches.ContainsKey('revision') -and $Matches['revision']) { [int] $Matches['revision'] } else { 0 }
+    return [Version]::new([int] $Matches['major'], $minor, $build, $revision)
+}
+
+function Get-RequiredDotNetFrameworks {
+    param([Parameter(Mandatory = $true)][string] $PayloadDirectory)
+
+    $hostDirectory = Join-Path $PayloadDirectory 'host'
+    if (-not (Test-Path -LiteralPath $hostDirectory -PathType Container)) {
+        return @()
+    }
+
+    $runtimeConfig = Get-ChildItem -LiteralPath $hostDirectory -Filter '*.runtimeconfig.json' -File |
+        Select-Object -First 1
+    if (-not $runtimeConfig) {
+        return @()
+    }
+
+    $runtimeConfigJson = Get-Content -LiteralPath $runtimeConfig.FullName -Raw | ConvertFrom-Json
+    $runtimeOptionsProperty = $runtimeConfigJson.PSObject.Properties['runtimeOptions']
+    if (-not $runtimeOptionsProperty) {
+        return @()
+    }
+
+    $frameworks = New-Object System.Collections.Generic.List[object]
+    $runtimeOptions = $runtimeOptionsProperty.Value
+    $frameworkProperty = $runtimeOptions.PSObject.Properties['framework']
+    if ($frameworkProperty) {
+        $frameworks.Add($frameworkProperty.Value)
+    }
+
+    $frameworksProperty = $runtimeOptions.PSObject.Properties['frameworks']
+    if ($frameworksProperty) {
+        foreach ($framework in $frameworksProperty.Value) {
+            $frameworks.Add($framework)
+        }
+    }
+
+    return $frameworks | Where-Object {
+        $_.PSObject.Properties['name'] -and $_.PSObject.Properties['version']
+    }
+}
+
+function Test-DotNetFrameworkInstalled {
+    param(
+        [Parameter(Mandatory = $true)][string] $FrameworkName,
+        [Parameter(Mandatory = $true)][Version] $MinimumVersion,
+        [Parameter(Mandatory = $true)] $DotNetCommand
+    )
+
+    $runtimes = & $DotNetCommand.Source --list-runtimes 2>$null
+    foreach ($runtime in $runtimes) {
+        if ($runtime -match '^(?<name>\S+)\s+(?<version>\d+(\.\d+){1,3})\s+\[') {
+            $runtimeVersion = ConvertTo-RuntimeVersion -Version $Matches['version']
+            if ($Matches['name'] -eq $FrameworkName -and
+                $runtimeVersion.Major -eq $MinimumVersion.Major -and
+                $runtimeVersion -ge $MinimumVersion) {
+                return $true
+            }
+        }
+    }
+
+    return $false
+}
+
+function Assert-DotNetRuntimeRequirements {
+    param([Parameter(Mandatory = $true)][string] $PayloadDirectory)
+
+    $requirements = @(Get-RequiredDotNetFrameworks -PayloadDirectory $PayloadDirectory)
+    if ($requirements.Count -eq 0) {
+        return
+    }
+
+    $dotNetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
+    foreach ($requirement in $requirements) {
+        $frameworkName = [string] $requirement.name
+        $minimumVersion = ConvertTo-RuntimeVersion -Version ([string] $requirement.version)
+        $displayVersion = "$($minimumVersion.Major).$($minimumVersion.Minor)"
+
+        if (-not $dotNetCommand) {
+            throw "$AppName requires $frameworkName $displayVersion or later in the same major version, but the dotnet command was not found. Install the .NET $displayVersion Runtime from https://dotnet.microsoft.com/download/dotnet/$displayVersion and rerun this installer."
+        }
+
+        if (-not (Test-DotNetFrameworkInstalled -FrameworkName $frameworkName -MinimumVersion $minimumVersion -DotNetCommand $dotNetCommand)) {
+            throw "$AppName requires $frameworkName $displayVersion or later in the same major version, but it is not installed. Install the .NET $displayVersion Runtime from https://dotnet.microsoft.com/download/dotnet/$displayVersion and rerun this installer. You can inspect installed runtimes with: dotnet --list-runtimes"
+        }
+    }
+}
+
 function New-StartMenuShortcut {
     param(
         [Parameter(Mandatory = $true)][string] $TargetRoot,
@@ -140,6 +238,7 @@ try {
     $payloadDirectory = Join-Path $tempRoot 'payload'
     [System.IO.File]::WriteAllBytes($zipPath, [Convert]::FromBase64String(($PayloadBase64 -replace '\s', '')))
     Expand-Archive -LiteralPath $zipPath -DestinationPath $payloadDirectory -Force
+    Assert-DotNetRuntimeRequirements -PayloadDirectory $payloadDirectory
 
     New-Item -ItemType Directory -Force -Path $targetRootFull | Out-Null
     Remove-ChildIfExists -Path (Join-Path $targetRootFull 'app') -Root $targetRootFull
