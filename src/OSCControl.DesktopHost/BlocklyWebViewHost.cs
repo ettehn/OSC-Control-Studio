@@ -9,6 +9,10 @@ internal sealed class BlocklyWebViewHost : UserControl
 {
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill };
     private readonly string _indexPath;
+    private readonly string _userDataFolder = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "OSCControl.DesktopHost",
+        "WebView2UserData");
 
     public BlocklyWebViewHost(string indexPath)
     {
@@ -30,11 +34,13 @@ internal sealed class BlocklyWebViewHost : UserControl
 
         try
         {
-            await _webView.EnsureCoreWebView2Async();
+            Directory.CreateDirectory(_userDataFolder);
+            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder);
+            await _webView.EnsureCoreWebView2Async(environment);
             _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             _webView.CoreWebView2.Navigate(new Uri(_indexPath).AbsoluteUri);
         }
-        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException or FileNotFoundException)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or NotSupportedException or FileNotFoundException or IOException)
         {
             ShowInitializationError(ex);
         }
@@ -75,7 +81,7 @@ internal sealed class BlocklyWebViewHost : UserControl
     private void ShowInitializationError(Exception ex)
     {
         Controls.Clear();
-        Controls.Add(CreateMessageLabel($"WebView2 could not be initialized. {ex.Message}"));
+        Controls.Add(CreateMessageLabel($"WebView2 could not be initialized. {ex.Message}{Environment.NewLine}{Environment.NewLine}User data folder: {_userDataFolder}"));
     }
 
     private static Label CreateMessageLabel(string message)
