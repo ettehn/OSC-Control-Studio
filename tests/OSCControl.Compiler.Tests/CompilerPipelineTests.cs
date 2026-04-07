@@ -102,18 +102,28 @@ on receive oscIn when msg.body.value == 1 [
     }
 
     [Fact]
-    public void Compile_FunctionDeclaration_IsRejectedByV01Validator()
+    public void Compile_FunctionDeclaration_LowersToRuntimePlan()
     {
         const string source = """
-func helper() [
-    stop
+func helper(value) [
+    log info value
+]
+
+on startup [
+    call helper("ok")
 ]
 """;
 
         var result = new CompilerPipeline().Compile(source);
 
-        var error = Assert.Single(result.Diagnostics, d => d.Severity == DiagnosticSeverity.Error);
-        Assert.Contains("not supported in OSCControl v0.1", error.Message);
+        Assert.False(result.HasErrors);
+        var plan = Assert.IsType<RuntimePlan>(result.Plan);
+        var function = Assert.Single(plan.Functions);
+        Assert.Equal("helper", function.Name);
+        Assert.Equal(["value"], function.Parameters);
+        Assert.IsType<RuntimeLogPlan>(Assert.Single(function.Steps));
+        var call = Assert.IsType<RuntimeInvokePlan>(Assert.Single(Assert.Single(plan.Rules).Steps));
+        Assert.Equal("helper", call.Name);
     }
 
     [Fact]

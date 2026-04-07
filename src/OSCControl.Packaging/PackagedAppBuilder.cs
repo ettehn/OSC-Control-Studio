@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using OSCControl.Compiler.Compiler;
 using OSCControl.Compiler.Runtime;
@@ -12,6 +13,13 @@ public sealed class PackagedAppBuilder
         WriteIndented = true
     };
 
+    private static readonly HashSet<string> WindowsReservedNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL",
+        "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"
+    };
+
     public async Task<PackageBuildResult> BuildAsync(PackageBuildRequest request, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -20,6 +28,7 @@ public sealed class PackagedAppBuilder
         var appName = string.IsNullOrWhiteSpace(request.AppName) ? "OSCControl App" : request.AppName.Trim();
         var appFolderName = SanitizeDirectoryName(appName);
         var hostSource = string.IsNullOrWhiteSpace(request.HostSource) ? null : Path.GetFullPath(request.HostSource);
+        var sourceScriptPath = string.IsNullOrWhiteSpace(request.ScriptPath) ? null : Path.GetFullPath(request.ScriptPath);
 
         if (hostSource is not null && !Directory.Exists(hostSource))
         {
@@ -39,11 +48,7 @@ public sealed class PackagedAppBuilder
         var hostFolder = Path.Combine(appRoot, "host");
         var assetsFolder = Path.Combine(appFolder, "assets");
 
-        Directory.CreateDirectory(appFolder);
-        Directory.CreateDirectory(dataFolder);
-        Directory.CreateDirectory(logsFolder);
-        Directory.CreateDirectory(hostFolder);
-        Directory.CreateDirectory(assetsFolder);
+        PreparePackageDirectory(appRoot, directoriesToClean: [appFolder, hostFolder], directoriesToCreate: [appFolder, dataFolder, logsFolder, hostFolder, assetsFolder]);
 
         var manifest = new PackagedAppManifest
         {
@@ -51,7 +56,8 @@ public sealed class PackagedAppBuilder
             Script = "app.osccontrol",
             Plan = "app.plan.json",
             Data = "../data",
-            Logs = "../logs"
+            Logs = "../logs",
+            SourceScript = sourceScriptPath
         };
 
         var scriptOutputPath = Path.Combine(appFolder, manifest.Script);
@@ -82,6 +88,34 @@ public sealed class PackagedAppBuilder
             RunCommandPath = runCommandPath,
             HostCopied = hostCopied
         };
+    }
+
+    private static void PreparePackageDirectory(string appRoot, IReadOnlyList<string> directoriesToClean, IReadOnlyList<string> directoriesToCreate)
+    {
+        Directory.CreateDirectory(appRoot);
+
+        foreach (var directory in directoriesToClean)
+        {
+            EnsureInsidePackageRoot(directory, appRoot);
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+
+        foreach (var directory in directoriesToCreate)
+        {
+            EnsureInsidePackageRoot(directory, appRoot);
+            Directory.CreateDirectory(directory);
+        }
+    }
+
+    private static void EnsureInsidePackageRoot(string path, string appRoot)
+    {
+        if (!IsPathInside(path, appRoot))
+        {
+            throw new InvalidOperationException($"Package directory escapes app root: {path}");
+        }
     }
 
     private static string BuildRunCommand() =>
@@ -119,8 +153,47 @@ public sealed class PackagedAppBuilder
     private static string SanitizeDirectoryName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
-        var chars = name.Select(ch => invalid.Contains(ch) ? '_' : ch).ToArray();
-        var sanitized = new string(chars).Trim();
-        return string.IsNullOrWhiteSpace(sanitized) ? "OSCControlApp" : sanitized;
+        var builder = new StringBuilder(name.Length);
+        var lastWasUnderscore = false;
+        foreach (var character in name)
+        {
+            var safe = invalid.Contains(character) || char.IsControl(character) ? '_' : character;
+            if (safe == '_')
+            {
+                if (lastWasUnderscore)
+                {
+                    continue;
+                }
+
+                lastWasUnderscore = true;
+            }
+            else
+            {
+                lastWasUnderscore = false;
+            }
+
+            builder.Append(safe);
+        }
+
+        var sanitized = builder.ToString().Trim().TrimEnd('.', ' ');
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            sanitized = "OSCControlApp";
+        }
+
+        var baseName = sanitized.Split('.')[0];
+        if (WindowsReservedNames.Contains(baseName))
+        {
+            sanitized = $"{sanitized}_app";
+        }
+
+        return sanitized;
+    }
+
+    private static bool IsPathInside(string path, string root)
+    {
+        var fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        return fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase);
     }
 }

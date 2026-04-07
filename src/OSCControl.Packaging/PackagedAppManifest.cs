@@ -11,4 +11,6 @@ public sealed class PackagedAppManifest
     public string Data { get; set; } = "../data";
 
     public string Logs { get; set; } = "../logs";
+
+    public string? SourceScript { get; set; }
 }

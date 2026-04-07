@@ -18,5 +18,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\OSCControl.Compiler\OSCControl.Compiler.csproj" />
+    <ProjectReference Include="..\..\src\OSCControl.Packaging\OSCControl.Packaging.csproj" />
   </ItemGroup>
 </Project>

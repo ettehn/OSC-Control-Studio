@@ -264,3 +264,43 @@ Recommended next steps:
 - Consider moving console runtime sinks into a shared utility only if duplication starts to affect behavior.
 - Keep `OSCControl.Packager` as the CLI source of truth for packaging, and let DesktopHost call or share that logic rather than reimplementing a second packager.
 - Add a small package smoke test once dependency restore is stable: package a trivial script, run `AppHost` against the packaged `app` folder, and verify it loads the plan.
+
+## Follow-Up Structure Review After Packaging Library
+
+This review reflects the newer structure where `OSCControl.Packaging` has been added and `DesktopHost` now exposes a `Package App...` button.
+
+Resolved since the previous review:
+
+- `OSCControl.DesktopHost` now has a packaging entry point through `PackageAppAsync`.
+- packaging logic has been moved into `OSCControl.Packaging`, so `DesktopHost` and `OSCControl.Packager` can share one builder instead of duplicating packaging behavior.
+- `PackagedAppManifest` is now shared by `AppHost` and the packaging library.
+- `PackagedAppManifest` now includes both `Data` and `Logs`.
+- generated `run.cmd` now prefers `host\OSCControl.AppHost.exe app` and falls back to `dotnet host\OSCControl.AppHost.dll app`.
+- `AppHost` now supports friendlier no-argument root discovery by checking its base directory, a child `app` folder, and the sibling `..\app` layout.
+
+Validation performed:
+
+- `dotnet build src\OSCControl.Packaging\OSCControl.Packaging.csproj --no-restore` succeeded with 0 warnings and 0 errors.
+- running the already-built `OSCControl.Packager.dll` successfully packaged `sample-vrchat-trigger.osccontrol` into `C:\CodexProjects\artifacts\advice-review\AdviceReviewApp`.
+- the packaged output included `run.cmd`, `app\app.manifest.json`, `app\app.osccontrol`, `app\app.plan.json`, and copied host binaries.
+- launching the packaged `OSCControl.AppHost.exe` against the generated `app` folder loaded `app.plan.json` and printed `Running AdviceReviewApp`; the process was then killed manually because the host correctly stays alive waiting for runtime events.
+
+Open issues and risks:
+
+- build verification for `OSCControl.AppHost`, `OSCControl.Packager`, and `OSCControl.DesktopHost` was blocked in this sandbox. `--no-restore` failed without compiler errors, while `dotnet run` showed an environment error reading `C:\Users\Ethen\AppData\Roaming\NuGet\NuGet.Config`. Treat this as a verification environment issue until reproduced outside the sandbox.
+- repeated packaging into the same output folder can leave stale files because `PackagedAppBuilder` creates and overwrites files but does not clean `app`, `host`, or `assets` first. This can hide removed DLLs/assets and make package results non-reproducible.
+- `PackageBuildRequest.ScriptPath` is currently carried through the API but is not used by `PackagedAppBuilder`. Either remove it from the shared request or give it a concrete role such as manifest provenance or default app-name derivation.
+- `PackagedAppBuilder.SanitizeDirectoryName` handles invalid filename characters but not Windows reserved names such as `CON`, `PRN`, `AUX`, `NUL`, `COM1`, or trailing dot/space edge cases. Generated app names should be normalized more defensively before creating directories.
+- `AppHost` trusts manifest paths for `Script`, `Plan`, `Data`, and `Logs`. This is acceptable for self-generated packages, but if packages can be edited or imported, path containment should be enforced so manifest paths cannot escape the app folder.
+- `DesktopHost` host discovery is developer-workspace oriented: `artifacts\apphost`, `src\OSCControl.AppHost\bin\Debug\net8.0`, and `src\OSCControl.AppHost\bin\Release\net8.0`. A published product should point packaging at a bundled or configured host source rather than probing source-tree locations.
+- `MainForm.cs` is now carrying editor UI, Blocks UI, runtime controls, localization hooks, packaging workflow, and host discovery. The packaging direction works, but future changes will be safer if packaging orchestration and host-source selection move out of `MainForm`.
+
+Recommended next actions:
+
+- add a "clean package output" mode to `PackagedAppBuilder`, or write each package into a fresh versioned folder.
+- add a small automated smoke test around `PackagedAppBuilder`: package a trivial startup script, assert manifest/plan/script/run command exist, and deserialize the generated plan.
+- add an AppHost root-resolution test for explicit app folder, host base folder, and sibling `..\app` layouts.
+- harden app name normalization for reserved Windows device names and trailing dot/space cases.
+- decide whether generated packages are trusted. If not, add path containment checks for all manifest-relative paths before creating directories or reading files.
+- make host-source selection an explicit packaging setting in DesktopHost, with the current probing logic retained only as a development fallback.
+- document a stable verification command for constrained environments, for example using a repo-local NuGet config and a pre-restored package cache, so build failures do not look like source failures.

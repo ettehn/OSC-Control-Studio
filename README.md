@@ -1,13 +1,14 @@
 ﻿# OSCControl
 
-OSCControl 是一个面向 Windows 的 OSC / WebSocket / VRChat OSC 自动化工具链，包含桌面宿主、脚本语言、Blocks 可视化生成器、运行时宿主和打包器。
+OSCControl 鏄竴涓潰鍚?Windows 鐨?OSC / WebSocket / VRChat OSC 鑷姩鍖栧伐鍏烽摼锛屽寘鍚闈㈠涓汇€佽剼鏈瑷€銆丅locks 鍙鍖栫敓鎴愬櫒銆佽繍琛屾椂瀹夸富鍜屾墦鍖呭櫒銆?
+## 鐢ㄦ埛璇存槑
 
-## 用户说明
+- [涓枃鐢ㄦ埛璇存槑](docs/USER-GUIDE.zh-CN.md)
 
-- [中文用户说明](docs/USER-GUIDE.zh-CN.md)
+## 寮€鍙戞枃妗?
+- [璇█瑙勮寖](OSCControl-language-spec.md)
+- [瑙ｆ瀽鍣ㄨ璁(OSCControl-parser-design.md)
+- [VRChat OSC 璇硶绯栬褰昡(VRChat-OSC-sugar.md)
+- [楠岃瘉鍛戒护](docs/VERIFICATION.md)
+- [NuGet restore 问题记录](docs/NUGET-RESTORE-ISSUE.md)
 
-## 开发文档
-
-- [语言规范](OSCControl-language-spec.md)
-- [解析器设计](OSCControl-parser-design.md)
-- [VRChat OSC 语法糖记录](VRChat-OSC-sugar.md)
