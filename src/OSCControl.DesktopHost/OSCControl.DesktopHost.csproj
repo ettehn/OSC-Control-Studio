@@ -19,6 +19,11 @@
   <ItemGroup Condition="'$(EnableBlocklyWebView2)' == 'true'">
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3856.49" />
   </ItemGroup>
+  <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences" Condition="'$(EnableBlocklyWebView2)' == 'true'">
+    <ItemGroup>
+      <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+    </ItemGroup>
+  </Target>
   <ItemGroup>
     <ProjectReference Include="..\OSCControl.Compiler\OSCControl.Compiler.csproj" />
     <ProjectReference Include="..\OSCControl.Packaging\OSCControl.Packaging.csproj" />

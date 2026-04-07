@@ -1,0 +1,13 @@
+{
+  "name": "osccontrol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OSCControl desktop Blockly asset dependencies.",
+  "type": "commonjs",
+  "scripts": {
+    "check:blockly-assets": "node --check src/OSCControl.DesktopHost/BlocklyAssets/osccontrol-editor.js && node --check src/OSCControl.DesktopHost/BlocklyAssets/osccontrol-generator.js && node --check src/OSCControl.DesktopHost/BlocklyAssets/osccontrol-blocks.js"
+  },
+  "devDependencies": {
+    "blockly": "^12.5.1"
+  }
+}

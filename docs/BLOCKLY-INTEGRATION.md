@@ -128,7 +128,20 @@ $env:NUGET_PACKAGES='C:\CodexProjects\.nuget\packages'
 dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj -m:1 -nr:false -v:minimal /p:EnableBlocklyWebView2=true
 ```
 
-The branch currently pins `Microsoft.Web.WebView2` to `1.0.3856.49`, the latest stable version I found on NuGet while preparing this branch. In the current sandbox, the enabled build fails at restore with `NU1301` because NuGet cannot load `https://api.nuget.org/v3/index.json`.
+The branch currently pins `Microsoft.Web.WebView2` to `1.0.3856.49`.
+
+## Vendored Blockly Assets
+
+Blockly is installed through npm and the runtime browser files are vendored into `src/OSCControl.DesktopHost/BlocklyAssets/vendor/blockly`.
+
+Committed runtime files:
+
+- `blockly_compressed.js`
+- `blocks_compressed.js`
+- `msg/en.js`
+- `msg/zh-hans.js`
+
+The root `package.json` and `package-lock.json` are kept so the vendor payload can be refreshed with `npm install`. Do not commit `node_modules`.
 
 ## References
 
