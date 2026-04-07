@@ -20,7 +20,7 @@ OSC-Control-Studio 是一个面向 Windows 的 OSC / WebSocket / VRChat OSC 自�
 - [Blockly Integration](docs/BLOCKLY-INTEGRATION.md)
 - [VRChat OSC Sugar](VRChat-OSC-sugar.md)
 - [WebSocket Runtime](docs/WEBSOCKET-RUNTIME.md)
-- [Installer](docs/INSTALLER.md)
+- [Portable Release](docs/PORTABLE-RELEASE.md)
 - [Verification](docs/VERIFICATION.md)
 
 ## Build And Verification

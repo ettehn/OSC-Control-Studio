@@ -2,19 +2,32 @@
 
 This folder contains a locally built Windows framework-dependent release of OSC Control Studio.
 
+## Recommended Download
+
+Use the portable zip:
+
+```text
+archives/OSC-Control-Studio-2026-04-07-win-x64-portable.zip
+```
+
+Extract it, then run:
+
+```text
+OSC-Control-Studio/run.cmd
+```
+
 ## Contents
 
-- `build/OSC-Control-Studio/`: desktop host package with Blockly/WebView2 enabled.
+- `archives/OSC-Control-Studio-2026-04-07-win-x64-portable.zip`: portable desktop package for direct distribution.
+- `build/OSC-Control-Studio/`: uncompressed desktop host package with Blockly/WebView2 enabled.
 - `build/OSCControl.AppHost/`: runtime app host publish output.
 - `build/OSCControl.Packager/`: packaged-app builder CLI publish output.
 - `build/oscctlc/`: compiler/debug CLI publish output.
-- `installers/Install-OSC-Control-Studio.ps1`: PowerShell installer for the desktop host package.
 - `SHA256SUMS.txt`: SHA256 checksums for release files.
 
-## Install
+## Runtime Requirements
 
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\installers\Install-OSC-Control-Studio.ps1
-```
+This build is framework-dependent. The target machine needs:
 
-The installer requires the .NET 8 Desktop Runtime and WebView2 Runtime on the target machine.
+- .NET 8 Desktop Runtime
+- Microsoft Edge WebView2 Runtime
