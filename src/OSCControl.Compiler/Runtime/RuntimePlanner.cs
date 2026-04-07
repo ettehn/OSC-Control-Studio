@@ -9,7 +9,8 @@ public sealed class RuntimePlanner
         var endpoints = program.Endpoints.Select(PlanEndpoint).ToList();
         var states = program.States.Select(PlanState).ToList();
         var rules = program.Rules.Select((rule, index) => PlanRule(rule, index)).ToList();
-        return new RuntimePlan(endpoints, states, rules);
+        var functions = program.Functions.Select(PlanFunction).ToList();
+        return new RuntimePlan(endpoints, states, rules, functions);
     }
 
     private static RuntimeEndpointPlan PlanEndpoint(ExecutionEndpoint endpoint) =>
@@ -20,6 +21,9 @@ public sealed class RuntimePlanner
 
     private static RuntimeRulePlan PlanRule(ExecutionRule rule, int index) =>
         new(index, PlanTrigger(rule.Trigger), rule.Condition is null ? null : PlanExpression(rule.Condition), rule.Steps.Select(PlanStep).ToList());
+
+    private static RuntimeFunctionPlan PlanFunction(ExecutionFunction function) =>
+        new(function.Name, function.Parameters, function.Steps.Select(PlanStep).ToList());
 
     private static RuntimeTriggerPlan PlanTrigger(ExecutionTrigger trigger) => trigger switch
     {

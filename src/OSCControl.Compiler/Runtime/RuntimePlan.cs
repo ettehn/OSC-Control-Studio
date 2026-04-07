@@ -3,7 +3,8 @@ namespace OSCControl.Compiler.Runtime;
 public sealed record RuntimePlan(
     IReadOnlyList<RuntimeEndpointPlan> Endpoints,
     IReadOnlyList<RuntimeStatePlan> States,
-    IReadOnlyList<RuntimeRulePlan> Rules);
+    IReadOnlyList<RuntimeRulePlan> Rules,
+    IReadOnlyList<RuntimeFunctionPlan> Functions);
 
 public sealed record RuntimeEndpointPlan(
     string Name,
@@ -18,6 +19,11 @@ public sealed record RuntimeRulePlan(
     int Order,
     RuntimeTriggerPlan Trigger,
     RuntimeExpressionPlan? Guard,
+    IReadOnlyList<RuntimeStepPlan> Steps);
+
+public sealed record RuntimeFunctionPlan(
+    string Name,
+    IReadOnlyList<string> Parameters,
     IReadOnlyList<RuntimeStepPlan> Steps);
 
 public abstract record RuntimeTriggerPlan;

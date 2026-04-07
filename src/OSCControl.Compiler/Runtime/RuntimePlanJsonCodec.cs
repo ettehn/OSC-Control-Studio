@@ -18,10 +18,11 @@ public static class RuntimePlanJsonCodec
             ["version"] = Version,
             ["endpoints"] = WriteArray(plan.Endpoints, WriteEndpoint),
             ["states"] = WriteArray(plan.States, WriteState),
-            ["rules"] = WriteArray(plan.Rules, WriteRule)
+            ["rules"] = WriteArray(plan.Rules, WriteRule),
+            ["functions"] = WriteArray(plan.Functions, WriteFunction)
         };
 
-        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = indented });
+        return root.ToJsonString(new JsonSerializerOptions { WriteIndented = indented, TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver() });
     }
 
     public static RuntimePlan Deserialize(string json)
@@ -44,7 +45,8 @@ public static class RuntimePlanJsonCodec
         return new RuntimePlan(
             ReadArray(root, "endpoints", ReadEndpoint),
             ReadArray(root, "states", ReadState),
-            ReadArray(root, "rules", ReadRule));
+            ReadArray(root, "rules", ReadRule),
+            ReadOptionalArray(root, "functions", ReadFunction) ?? []);
     }
 
     private static JsonNode WriteEndpoint(RuntimeEndpointPlan endpoint) => new JsonObject
@@ -95,6 +97,21 @@ public static class RuntimePlanJsonCodec
             ReadArray(obj, "steps", ReadStep));
     }
 
+    private static JsonNode WriteFunction(RuntimeFunctionPlan function) => new JsonObject
+    {
+        ["name"] = function.Name,
+        ["parameters"] = WriteStringArray(function.Parameters),
+        ["steps"] = WriteArray(function.Steps, WriteStep)
+    };
+
+    private static RuntimeFunctionPlan ReadFunction(JsonNode node)
+    {
+        var obj = RequireObject(node, "function");
+        return new RuntimeFunctionPlan(
+            RequireString(obj, "name"),
+            ReadStringArray(obj, "parameters"),
+            ReadArray(obj, "steps", ReadStep));
+    }
     private static JsonNode WriteTrigger(RuntimeTriggerPlan trigger)
     {
         return trigger switch
@@ -241,6 +258,22 @@ public static class RuntimePlanJsonCodec
         return !obj.TryGetPropertyValue(propertyName, out var node) || node is null ? null : ReadExpression(node);
     }
 
+    private static JsonArray WriteStringArray(IEnumerable<string> items)
+    {
+        var array = new JsonArray();
+        foreach (var item in items)
+        {
+            array.Add(item);
+        }
+
+        return array;
+    }
+
+    private static IReadOnlyList<string> ReadStringArray(JsonObject obj, string propertyName)
+    {
+        var array = RequireArray(RequireNode(obj, propertyName), propertyName);
+        return array.Select(node => node?.GetValue<string>() ?? throw new JsonException($"Array '{propertyName}' contains null.")).ToArray();
+    }
     private static JsonArray WriteArray<T>(IEnumerable<T> items, Func<T, JsonNode> write)
     {
         var array = new JsonArray();

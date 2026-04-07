@@ -3,7 +3,8 @@ namespace OSCControl.Compiler.Execution;
 public sealed record ExecutionProgram(
     IReadOnlyList<ExecutionEndpoint> Endpoints,
     IReadOnlyList<ExecutionStateSlot> States,
-    IReadOnlyList<ExecutionRule> Rules);
+    IReadOnlyList<ExecutionRule> Rules,
+    IReadOnlyList<ExecutionFunction> Functions);
 
 public sealed record ExecutionEndpoint(
     string Name,
@@ -17,6 +18,11 @@ public sealed record ExecutionStateSlot(
 public sealed record ExecutionRule(
     ExecutionTrigger Trigger,
     ExecutionExpression? Condition,
+    IReadOnlyList<ExecutionStep> Steps);
+
+public sealed record ExecutionFunction(
+    string Name,
+    IReadOnlyList<string> Parameters,
     IReadOnlyList<ExecutionStep> Steps);
 
 public abstract record ExecutionTrigger;

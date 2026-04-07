@@ -9,17 +9,20 @@ internal sealed class RuntimeStepExecutor
     private readonly RuntimeTransportScheduler _transportScheduler;
     private readonly IRuntimeLogSink _logSink;
     private readonly IRuntimeCommandInvoker _commandInvoker;
+    private readonly IReadOnlyDictionary<string, RuntimeFunctionPlan> _functions;
 
     public RuntimeStepExecutor(
         RuntimeExpressionEvaluator evaluator,
         RuntimeTransportScheduler transportScheduler,
         IRuntimeLogSink logSink,
-        IRuntimeCommandInvoker commandInvoker)
+        IRuntimeCommandInvoker commandInvoker,
+        IReadOnlyDictionary<string, RuntimeFunctionPlan> functions)
     {
         _evaluator = evaluator;
         _transportScheduler = transportScheduler;
         _logSink = logSink;
         _commandInvoker = commandInvoker;
+        _functions = functions;
     }
 
     public async Task ExecuteAsync(IReadOnlyList<RuntimeStepPlan> steps, RuntimeExecutionScope scope, CancellationToken cancellationToken)
@@ -79,6 +82,12 @@ internal sealed class RuntimeStepExecutor
 
             case RuntimeInvokePlan invoke:
                 var arguments = invoke.Arguments.Select(argument => RuntimeValueHelpers.CloneValue(_evaluator.Evaluate(argument, scope))).ToArray();
+                if (_functions.TryGetValue(invoke.Name, out var function))
+                {
+                    await InvokeFunctionAsync(function, arguments, scope, cancellationToken);
+                    return;
+                }
+
                 await _commandInvoker.InvokeAsync(invoke.Name, arguments, new RuntimeCommandContext(scope.State, scope.Message, new ReadOnlyDictionary<string, object?>(scope.Locals), scope.Clock), cancellationToken);
                 return;
 
@@ -95,6 +104,32 @@ internal sealed class RuntimeStepExecutor
         }
     }
 
+    private async Task InvokeFunctionAsync(RuntimeFunctionPlan function, IReadOnlyList<object?> arguments, RuntimeExecutionScope scope, CancellationToken cancellationToken)
+    {
+        if (arguments.Count != function.Parameters.Count)
+        {
+            throw new InvalidOperationException($"Function '{function.Name}' expects {function.Parameters.Count} argument(s), got {arguments.Count}.");
+        }
+
+        var previousLocals = scope.Locals.ToDictionary(pair => pair.Key, pair => RuntimeValueHelpers.CloneValue(pair.Value), StringComparer.Ordinal);
+        try
+        {
+            for (var index = 0; index < function.Parameters.Count; index++)
+            {
+                scope.Locals[function.Parameters[index]] = RuntimeValueHelpers.CloneValue(arguments[index]);
+            }
+
+            await ExecuteAsync(function.Steps, scope, cancellationToken);
+        }
+        finally
+        {
+            scope.Locals.Clear();
+            foreach (var pair in previousLocals)
+            {
+                scope.Locals[pair.Key] = RuntimeValueHelpers.CloneValue(pair.Value);
+            }
+        }
+    }
     private async Task ExecuteForEachAsync(RuntimeForEachPlan loop, RuntimeExecutionScope scope, CancellationToken cancellationToken)
     {
         var source = _evaluator.Evaluate(loop.Source, scope);

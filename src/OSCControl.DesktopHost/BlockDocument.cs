@@ -102,7 +102,9 @@ internal sealed class BlockStep
 
     public BindingList<BlockStep> Children { get; } = [];
 
-    public bool IsContainer => Kind == BlockStepKind.While;
+    public BindingList<BlockStep> ElseChildren { get; } = [];
+
+    public bool IsContainer => Kind is BlockStepKind.While or BlockStepKind.If;
 
     public override string ToString() => Kind.ToString();
 }
@@ -135,6 +137,7 @@ internal enum BlockStepKind
     Store,
     Send,
     Stop,
+    If,
     While,
     Break,
     Continue,

@@ -44,6 +44,7 @@ internal sealed class MainForm : Form
     private ComboBox _stepPayloadComboBox = null!;
     private TextBox _stepExtraTextBox = null!;
     private Button _stepEnterBodyButton = null!;
+    private Button _stepEnterElseButton = null!;
     private Button _stepBackButton = null!;
     private readonly Control _blocksEditorRoot;
     private readonly bool _useSimplifiedChinese = DesktopLocalization.UseSimplifiedChinese();
@@ -242,6 +243,7 @@ internal sealed class MainForm : Form
         new(BlockStepKind.Store, L("Store", "Store")),
         new(BlockStepKind.Send, L("Send", "Send")),
         new(BlockStepKind.Stop, L("Stop", "Stop")),
+        new(BlockStepKind.If, L("If", "If")),
         new(BlockStepKind.While, L("While", "While")),
         new(BlockStepKind.Break, L("Break", "Break")),
         new(BlockStepKind.Continue, L("Continue", "Continue")),
@@ -514,6 +516,7 @@ internal sealed class MainForm : Form
         stepButtons.Controls.Add(CreateButton(L("Add Log", "Add Log"), (_, _) => AddStep(BlockStepKind.Log)));
         stepButtons.Controls.Add(CreateButton(L("Add Store", "Add Store"), (_, _) => AddStep(BlockStepKind.Store)));
         stepButtons.Controls.Add(CreateButton(L("Add Send", "Add Send"), (_, _) => AddStep(BlockStepKind.Send)));
+        stepButtons.Controls.Add(CreateButton(L("Add If", "Add If"), (_, _) => AddStep(BlockStepKind.If)));
         stepButtons.Controls.Add(CreateButton(L("Add While", "Add While"), (_, _) => AddStep(BlockStepKind.While)));
         stepButtons.Controls.Add(CreateButton(L("Add Break", "Add Break"), (_, _) => AddStep(BlockStepKind.Break)));
         stepButtons.Controls.Add(CreateButton(L("Add Continue", "Add Continue"), (_, _) => AddStep(BlockStepKind.Continue)));
@@ -524,6 +527,8 @@ internal sealed class MainForm : Form
         stepButtons.Controls.Add(CreateButton(L("Add VRChat Typing", "Add VRChat Typing"), (_, _) => AddStep(BlockStepKind.VrchatTyping)));
         _stepEnterBodyButton = CreateButton(L("Enter Body", "Enter Body"), (_, _) => EnterSelectedStepBody());
         stepButtons.Controls.Add(_stepEnterBodyButton);
+        _stepEnterElseButton = CreateButton(L("Enter Else", "Enter Else"), (_, _) => EnterSelectedStepElseBody());
+        stepButtons.Controls.Add(_stepEnterElseButton);
         _stepBackButton = CreateButton(L("Back", "Back"), (_, _) => ExitStepBody());
         stepButtons.Controls.Add(_stepBackButton);
         stepButtons.Controls.Add(CreateButton(L("Move Up", "Move Up"), (_, _) => MoveSelectedStep(-1)));
@@ -1128,6 +1133,11 @@ internal sealed class MainForm : Form
             clone.Children.Add(CloneStep(child));
         }
 
+        foreach (var child in source.ElseChildren)
+        {
+            clone.ElseChildren.Add(CloneStep(child));
+        }
+
         return clone;
     }
 
@@ -1136,6 +1146,7 @@ internal sealed class MainForm : Form
         BlockStepKind.Log => new BlockStep { Kind = BlockStepKind.Log, Target = "info", Value = "next step" },
         BlockStepKind.Store => new BlockStep { Kind = BlockStepKind.Store, Target = "state_value", Value = "arg(0)" },
         BlockStepKind.Send => new BlockStep { Kind = BlockStepKind.Send, Target = string.Empty, Value = "/example", PayloadMode = BlockPayloadMode.Args, Extra = "1, 2, 3" },
+        BlockStepKind.If => CreateDefaultIfStep(),
         BlockStepKind.While => CreateDefaultWhileStep(),
         BlockStepKind.Break => new BlockStep { Kind = BlockStepKind.Break },
         BlockStepKind.Continue => new BlockStep { Kind = BlockStepKind.Continue },
@@ -1147,6 +1158,17 @@ internal sealed class MainForm : Form
         _ => new BlockStep { Kind = kind }
     };
 
+    private static BlockStep CreateDefaultIfStep()
+    {
+        var step = new BlockStep
+        {
+            Kind = BlockStepKind.If,
+            Value = "arg(0) > 0",
+        };
+        step.Children.Add(new BlockStep { Kind = BlockStepKind.Log, Target = "info", Value = "condition matched" });
+        step.ElseChildren.Add(new BlockStep { Kind = BlockStepKind.Log, Target = "info", Value = "condition not matched" });
+        return step;
+    }
     private static BlockStep CreateDefaultWhileStep()
     {
         var step = new BlockStep
@@ -1249,7 +1271,7 @@ internal sealed class MainForm : Form
         var hasStep = SelectedStep is not null;
         _stepKindComboBox.Enabled = hasStep;
         _stepTargetTextBox.Enabled = hasStep && kind is BlockStepKind.Log or BlockStepKind.Store or BlockStepKind.Send or BlockStepKind.VrchatParam or BlockStepKind.VrchatInput;
-        _stepValueTextBox.Enabled = hasStep && kind is BlockStepKind.Log or BlockStepKind.Store or BlockStepKind.Send or BlockStepKind.While or BlockStepKind.VrchatParam or BlockStepKind.VrchatInput or BlockStepKind.VrchatChat or BlockStepKind.VrchatTyping;
+        _stepValueTextBox.Enabled = hasStep && kind is BlockStepKind.Log or BlockStepKind.Store or BlockStepKind.Send or BlockStepKind.If or BlockStepKind.While or BlockStepKind.VrchatParam or BlockStepKind.VrchatInput or BlockStepKind.VrchatChat or BlockStepKind.VrchatTyping;
         _stepPayloadComboBox.Enabled = hasStep && kind == BlockStepKind.Send;
         _stepExtraTextBox.Enabled = hasStep && kind is BlockStepKind.Send or BlockStepKind.VrchatChat;
     }
@@ -1295,20 +1317,33 @@ internal sealed class MainForm : Form
             step.Extra = string.Empty;
         }
 
-        if (step.Kind == BlockStepKind.While)
+        if (step.Kind is BlockStepKind.If or BlockStepKind.While)
         {
             step.Target = string.Empty;
             step.PayloadMode = BlockPayloadMode.None;
             step.Extra = string.Empty;
-            if (previousKind != BlockStepKind.While && step.Children.Count == 0)
+            if (previousKind != step.Kind)
             {
-                step.Children.Add(new BlockStep { Kind = BlockStepKind.Break });
+                step.Children.Clear();
+                step.ElseChildren.Clear();
+            }
+
+            if (step.Children.Count == 0)
+            {
+                if (step.Kind == BlockStepKind.While)
+                {
+                    step.Children.Add(new BlockStep { Kind = BlockStepKind.Break });
+                }
+                else
+                {
+                    step.Children.Add(new BlockStep { Kind = BlockStepKind.Log, Target = "info", Value = "condition matched" });
+                }
             }
         }
-
-        if (step.Kind != BlockStepKind.While && previousKind == BlockStepKind.While)
+        else if (previousKind is BlockStepKind.If or BlockStepKind.While)
         {
             step.Children.Clear();
+            step.ElseChildren.Clear();
         }
 
         if (step.Kind != BlockStepKind.VrchatChat && step.Kind != BlockStepKind.Send)
@@ -1585,6 +1620,7 @@ internal sealed class MainForm : Form
             BlockStepKind.Log => Color.FromArgb(229, 243, 255),
             BlockStepKind.Store => Color.FromArgb(232, 246, 230),
             BlockStepKind.Send => Color.FromArgb(255, 236, 214),
+            BlockStepKind.If => Color.FromArgb(255, 244, 214),
             BlockStepKind.While => Color.FromArgb(248, 233, 255),
             BlockStepKind.Break => Color.FromArgb(255, 229, 229),
             BlockStepKind.Continue => Color.FromArgb(232, 248, 255),
@@ -1610,6 +1646,7 @@ internal sealed class MainForm : Form
             BlockStepKind.Log => _useSimplifiedChinese ? $"日志 {FormatDisplayValue(step.Target, "info")}" : $"Log {FormatDisplayValue(step.Target, "info")}",
             BlockStepKind.Store => _useSimplifiedChinese ? $"存储 {FormatDisplayValue(step.Target, "状态")}" : $"Store {FormatDisplayValue(step.Target, "state")}",
             BlockStepKind.Send => _useSimplifiedChinese ? $"发送 {FormatDisplayValue(step.Target, "端点")}" : $"Send {FormatDisplayValue(step.Target, "endpoint")}",
+            BlockStepKind.If => L("If", "If"),
             BlockStepKind.While => L("While", "While"),
             BlockStepKind.Break => L("Break", "Break"),
             BlockStepKind.Continue => L("Continue", "Continue"),
@@ -1625,6 +1662,7 @@ internal sealed class MainForm : Form
             BlockStepKind.Log => FormatDisplayValue(step.Value, L("message", "message")),
             BlockStepKind.Store => FormatDisplayValue(step.Value, L("expression", "expression")),
             BlockStepKind.Send => $"{FormatDisplayValue(step.Value, "/address")} | {FormatPayloadMode(step.PayloadMode)} | {FormatDisplayValue(step.Extra, L("payload", "payload"))}",
+            BlockStepKind.If => _useSimplifiedChinese ? $"条件 {FormatDisplayValue(step.Value, "true")} | then {step.Children.Count} / else {step.ElseChildren.Count}" : $"Condition {FormatDisplayValue(step.Value, "true")} | then {step.Children.Count} / else {step.ElseChildren.Count}",
             BlockStepKind.While => _useSimplifiedChinese ? $"条件 {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} 个子步骤" : $"Condition {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} child step(s)",
             BlockStepKind.Break => L("Exit the current loop immediately", "Exit the current loop immediately"),
             BlockStepKind.Continue => L("Skip to the next loop iteration", "Skip to the next loop iteration"),
@@ -1701,6 +1739,7 @@ internal sealed class MainForm : Form
             BlockStepKind.Log => L("Log: Target = log level (info/warn/error/debug), Value = text or expression.", "Log: Target = log level (info/warn/error/debug), Value = text or expression."),
             BlockStepKind.Store => L("Store: Target = state name, Value = expression to keep between events.", "Store: Target = state name, Value = expression to keep between events."),
             BlockStepKind.Send => L("Send: Target = endpoint name, Value = address, Payload = Args or Body, Extra = payload content. For args you can type 1, 2, 3 and the generator will wrap it into [[...]].", "Send: Target = endpoint name, Value = address, Payload = Args or Body, Extra = payload content. For args you can type 1, 2, 3 and the generator will wrap it into [[...]]."),
+            BlockStepKind.If => L("If: Value = condition expression. Enter Body edits the then branch; Enter Else edits the else branch.", "If: Value = condition expression. Enter Body edits the then branch; Enter Else edits the else branch."),
             BlockStepKind.While => L("While: Value = condition expression, for example state(\"count\") < 3. Select it and click Enter Body to edit child steps.", "While: Value = condition expression, for example state(\"count\") < 3. Select it and click Enter Body to edit child steps."),
             BlockStepKind.Break => L("Break: exits the current while immediately. Other fields are ignored.", "Break: exits the current while immediately. Other fields are ignored."),
             BlockStepKind.Continue => L("Continue: skips the rest of the current loop iteration. Other fields are ignored.", "Continue: skips the rest of the current loop iteration. Other fields are ignored."),
@@ -1734,6 +1773,26 @@ internal sealed class MainForm : Form
         }
     }
 
+    private void EnterSelectedStepElseBody()
+    {
+        if (SelectedStep is not { Kind: BlockStepKind.If } step)
+        {
+            return;
+        }
+
+        _stepContainerStack.Push(new StepContainerContext(step.ElseChildren, step));
+        _stepBindingSource.DataSource = step.ElseChildren;
+        _stepsListBox.DataSource = _stepBindingSource;
+        RefreshStepDisplay();
+        if (step.ElseChildren.Count > 0)
+        {
+            SelectStep(step.ElseChildren[0]);
+        }
+        else
+        {
+            BindSelectedStep();
+        }
+    }
     private void ExitStepBody()
     {
         if (IsAtRootStepContainer || _stepContainerStack.Count == 0)
@@ -1773,6 +1832,7 @@ internal sealed class MainForm : Form
     private void UpdateStepNavigationButtons()
     {
         _stepEnterBodyButton.Enabled = SelectedStep?.IsContainer == true;
+        _stepEnterElseButton.Enabled = SelectedStep?.Kind == BlockStepKind.If;
         _stepBackButton.Enabled = !IsAtRootStepContainer;
     }
 

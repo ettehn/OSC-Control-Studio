@@ -9,7 +9,8 @@ public sealed class ExecutionLowerer
         var endpoints = program.Endpoints.Select(LowerEndpoint).ToList();
         var states = program.States.Select(LowerState).ToList();
         var rules = program.Rules.Select(LowerRule).ToList();
-        return new ExecutionProgram(endpoints, states, rules);
+        var functions = program.Functions.Select(LowerFunction).ToList();
+        return new ExecutionProgram(endpoints, states, rules, functions);
     }
 
     private static ExecutionEndpoint LowerEndpoint(LoweredEndpoint endpoint) =>
@@ -20,6 +21,9 @@ public sealed class ExecutionLowerer
 
     private static ExecutionRule LowerRule(LoweredRule rule) =>
         new(LowerTrigger(rule.Trigger), rule.Condition is null ? null : LowerExpression(rule.Condition), rule.Steps.Select(LowerStep).ToList());
+
+    private static ExecutionFunction LowerFunction(LoweredFunction function) =>
+        new(function.Name, function.Parameters, function.Steps.Select(LowerStep).ToList());
 
     private static ExecutionTrigger LowerTrigger(LoweredTrigger trigger) => trigger switch
     {

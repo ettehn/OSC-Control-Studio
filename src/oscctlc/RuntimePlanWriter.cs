@@ -36,6 +36,17 @@ internal static class RuntimePlanWriter
             WriteExpression("InitialValue", state.InitialValue, indent + 3);
         }
 
+        WriteNode(indent + 1, $"Functions ({plan.Functions.Count})");
+        foreach (var function in plan.Functions)
+        {
+            WriteNode(indent + 2, $"RuntimeFunctionPlan {function.Name}({string.Join(", ", function.Parameters)})");
+            WriteNode(indent + 3, $"Steps ({function.Steps.Count})");
+            foreach (var step in function.Steps)
+            {
+                WriteStep(step, indent + 4);
+            }
+        }
+
         WriteNode(indent + 1, $"Rules ({plan.Rules.Count})");
         foreach (var rule in plan.Rules)
         {
@@ -119,7 +130,21 @@ internal static class RuntimePlanWriter
                     WriteStep(nested, indent + 2);
                 }
                 break;
-            case RuntimeInvokePlan invoke:
+            case RuntimeWhilePlan loop:
+                WriteNode(indent, "RuntimeWhilePlan");
+                WriteExpression("Condition", loop.Condition, indent + 1);
+                WriteNode(indent + 1, $"Body ({loop.Body.Count})");
+                foreach (var nested in loop.Body)
+                {
+                    WriteStep(nested, indent + 2);
+                }
+                break;
+            case RuntimeBreakPlan:
+                WriteNode(indent, "RuntimeBreakPlan");
+                break;
+            case RuntimeContinuePlan:
+                WriteNode(indent, "RuntimeContinuePlan");
+                break;            case RuntimeInvokePlan invoke:
                 WriteNode(indent, $"RuntimeInvokePlan {invoke.Name}");
                 for (var i = 0; i < invoke.Arguments.Count; i++)
                 {

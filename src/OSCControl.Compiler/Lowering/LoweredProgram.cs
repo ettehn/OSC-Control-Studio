@@ -3,7 +3,8 @@ namespace OSCControl.Compiler.Lowering;
 public sealed record LoweredProgram(
     IReadOnlyList<LoweredEndpoint> Endpoints,
     IReadOnlyList<LoweredState> States,
-    IReadOnlyList<LoweredRule> Rules);
+    IReadOnlyList<LoweredRule> Rules,
+    IReadOnlyList<LoweredFunction> Functions);
 
 public sealed record LoweredEndpoint(
     string Name,
@@ -17,6 +18,11 @@ public sealed record LoweredState(
 public sealed record LoweredRule(
     LoweredTrigger Trigger,
     LoweredExpression? Condition,
+    IReadOnlyList<LoweredStep> Steps);
+
+public sealed record LoweredFunction(
+    string Name,
+    IReadOnlyList<string> Parameters,
     IReadOnlyList<LoweredStep> Steps);
 
 public abstract record LoweredTrigger;

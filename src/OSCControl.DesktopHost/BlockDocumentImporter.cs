@@ -240,6 +240,7 @@ internal static class BlockDocumentImporter
             {
                 Kind = BlockStepKind.Stop,
             },
+            IfStatementSyntax branch => ImportIf(branch, warnings),
             WhileStatementSyntax loop => ImportWhile(loop, warnings),
             BreakStatementSyntax => new BlockStep
             {
@@ -276,6 +277,37 @@ internal static class BlockDocumentImporter
         };
     }
 
+    private static BlockStep ImportIf(IfStatementSyntax branch, ICollection<string> warnings)
+    {
+        var step = new BlockStep
+        {
+            Kind = BlockStepKind.If,
+            Value = FormatInputExpression(branch.Condition)
+        };
+
+        foreach (var statement in branch.ThenBlock.Statements)
+        {
+            var child = ImportStep(statement, warnings);
+            if (child is not null)
+            {
+                step.Children.Add(child);
+            }
+        }
+
+        if (branch.ElseBlock is not null)
+        {
+            foreach (var statement in branch.ElseBlock.Statements)
+            {
+                var child = ImportStep(statement, warnings);
+                if (child is not null)
+                {
+                    step.ElseChildren.Add(child);
+                }
+            }
+        }
+
+        return step;
+    }
     private static BlockStep ImportWhile(WhileStatementSyntax loop, ICollection<string> warnings)
     {
         var step = new BlockStep

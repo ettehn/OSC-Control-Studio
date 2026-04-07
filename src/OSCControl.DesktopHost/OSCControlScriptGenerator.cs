@@ -154,6 +154,11 @@ internal static class OSCControlScriptGenerator
             {
                 CollectStates(step.Children, states, used);
             }
+
+            if (step.ElseChildren.Count > 0)
+            {
+                CollectStates(step.ElseChildren, states, used);
+            }
         }
     }
 
@@ -336,6 +341,29 @@ internal static class OSCControlScriptGenerator
             case BlockStepKind.Stop:
                 builder.Append(indent);
                 builder.AppendLine("stop");
+                return true;
+
+            case BlockStepKind.If:
+                builder.Append(indent);
+                builder.Append("if ");
+                builder.Append(FormatExpression(step.Value, "true"));
+                builder.AppendLine(" [");
+                var wroteThen = AppendSteps(builder, step.Children, endpointLookup, firstOutputEndpoint, endpointNames, indentLevel + 1);
+                if (!wroteThen)
+                {
+                    builder.Append(nestedIndent);
+                    builder.AppendLine("log info \"then\"");
+                }
+                builder.Append(indent);
+                builder.AppendLine("]");
+                if (step.ElseChildren.Count > 0)
+                {
+                    builder.Append(indent);
+                    builder.AppendLine("else [");
+                    AppendSteps(builder, step.ElseChildren, endpointLookup, firstOutputEndpoint, endpointNames, indentLevel + 1);
+                    builder.Append(indent);
+                    builder.AppendLine("]");
+                }
                 return true;
 
             case BlockStepKind.While:

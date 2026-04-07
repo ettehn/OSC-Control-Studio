@@ -15,10 +15,6 @@ public sealed class Validator
             {
                 switch (declaration)
                 {
-                    case FunctionDeclarationSyntax function:
-                        diagnostics.ReportError(function.Span, "Functions are parsed but not supported in OSCControl v0.1.");
-                        break;
-
                     case RuleDeclarationSyntax { Trigger: TimerTriggerSyntax timer }:
                         diagnostics.ReportError(timer.Span, "Timer triggers are parsed but not supported in OSCControl v0.1.");
                         break;

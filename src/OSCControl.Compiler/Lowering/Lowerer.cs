@@ -35,7 +35,12 @@ public sealed class Lowerer
             .Select(LowerRule)
             .ToList();
 
-        return new LoweredProgram(endpoints, states, rules);
+        var functions = program.Declarations
+            .OfType<FunctionDeclarationSyntax>()
+            .Select(LowerFunction)
+            .ToList();
+
+        return new LoweredProgram(endpoints, states, rules, functions);
     }
 
     private static void AddVrchatEndpoints(ICollection<LoweredEndpoint> endpoints, ObjectLiteralExpressionSyntax? config)
@@ -156,6 +161,9 @@ public sealed class Lowerer
 
     private static LoweredRule LowerRule(RuleDeclarationSyntax rule) =>
         new(LowerTrigger(rule.Trigger), rule.Condition is null ? null : LowerExpression(rule.Condition), LowerSteps(rule.Body.Statements));
+
+    private static LoweredFunction LowerFunction(FunctionDeclarationSyntax function) =>
+        new(function.Name.Name, function.Parameters.Select(parameter => parameter.Name).ToList(), LowerSteps(function.Body.Statements));
 
     private static LoweredTrigger LowerTrigger(TriggerSyntax trigger) => trigger switch
     {
