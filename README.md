@@ -5,7 +5,7 @@ Windows OSC / WebSocket / VRChat OSC automation toolkit with a custom DSL, Block
 OSC-Control-Studio 是一个面向 Windows 的 OSC / WebSocket / VRChat OSC 自动化工具链，包含自定义脚本语言、编译器、运行时、桌面宿主、Blockly 可视化编辑器和应用打包器。
 
 ## this project is still under construction
-## 项目还在建设中，可能无法运行
+## 项目还在建设中，可能无法正常运行
 
 ## User Guides / 用户说明
 
