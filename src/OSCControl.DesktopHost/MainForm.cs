@@ -51,7 +51,7 @@ internal sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = L("OSCControl ��������", "OSCControl Desktop Host");
+        Text = L("OSCControl Desktop Host", "OSCControl Desktop Host");
         Width = 1360;
         Height = 880;
         MinimumSize = new Size(1080, 720);
@@ -89,7 +89,7 @@ internal sealed class MainForm : Form
 
         var pathLabel = new Label
         {
-            Text = L("�ű�", "Script"),
+            Text = L("Script", "Script"),
             AutoSize = true,
             TextAlign = ContentAlignment.MiddleLeft,
             Margin = new Padding(0, 8, 8, 0),
@@ -103,16 +103,16 @@ internal sealed class MainForm : Form
         };
         topPanel.Controls.Add(_pathTextBox, 1, 0);
 
-        var browseButton = CreateButton(L("��", "Open"), async (_, _) => await BrowseAsync());
+        var browseButton = CreateButton(L("Open", "Open"), async (_, _) => await BrowseAsync());
         topPanel.Controls.Add(browseButton, 2, 0);
 
-        _reloadButton = CreateButton(L("���¼���", "Reload"), async (_, _) => await ReloadAsync());
+        _reloadButton = CreateButton(L("Reload", "Reload"), async (_, _) => await ReloadAsync());
         topPanel.Controls.Add(_reloadButton, 3, 0);
 
-        _saveButton = CreateButton(L("����", "Save"), async (_, _) => await SaveAsync());
+        _saveButton = CreateButton(L("Save", "Save"), async (_, _) => await SaveAsync());
         topPanel.Controls.Add(_saveButton, 4, 0);
 
-        _checkButton = CreateButton(L("���", "Check"), async (_, _) => await CheckAsync());
+        _checkButton = CreateButton(L("Check", "Check"), async (_, _) => await CheckAsync());
         topPanel.Controls.Add(_checkButton, 5, 0);
 
         var runPanel = new FlowLayoutPanel
@@ -123,10 +123,10 @@ internal sealed class MainForm : Form
         };
         topPanel.Controls.Add(runPanel, 6, 0);
 
-        _startButton = CreateButton(L("���", "Start"), async (_, _) => await StartAsync());
+        _startButton = CreateButton(L("Start", "Start"), async (_, _) => await StartAsync());
         runPanel.Controls.Add(_startButton);
 
-        _stopButton = CreateButton(L("ֹͣ", "Stop"), async (_, _) => await StopAsync());
+        _stopButton = CreateButton(L("Stop", "Stop"), async (_, _) => await StopAsync());
         _stopButton.Enabled = false;
         runPanel.Controls.Add(_stopButton);
 
@@ -136,7 +136,7 @@ internal sealed class MainForm : Form
         };
         root.Controls.Add(_editorTabs, 0, 1);
 
-        _scriptTab = new TabPage(L("�ű�", "Script"));
+        _scriptTab = new TabPage(L("Script", "Script"));
         _editorTabs.TabPages.Add(_scriptTab);
 
         _editorTextBox = new TextBox
@@ -152,12 +152,12 @@ internal sealed class MainForm : Form
         };
         _scriptTab.Controls.Add(_editorTextBox);
 
-        _blocksTab = new TabPage(L("��ľ", "Blocks"));
+        _blocksTab = new TabPage(L("Blocks", "Blocks"));
         _editorTabs.TabPages.Add(_blocksTab);
         _blocksEditorRoot = CreateBlocksEditor(monoFont);
         _blocksTab.Controls.Add(_blocksEditorRoot);
 
-        var diagnosticsTab = new TabPage(L("���", "Diagnostics"));
+        var diagnosticsTab = new TabPage(L("Diagnostics", "Diagnostics"));
         _editorTabs.TabPages.Add(diagnosticsTab);
 
         _diagnosticsView = new ListView
@@ -167,13 +167,13 @@ internal sealed class MainForm : Form
             FullRowSelect = true,
             GridLines = true,
         };
-        _diagnosticsView.Columns.Add(L("���ؼ���", "Severity"), 90);
-        _diagnosticsView.Columns.Add(L("��", "Line"), 60);
-        _diagnosticsView.Columns.Add(L("��", "Column"), 70);
-        _diagnosticsView.Columns.Add(L("��Ϣ", "Message"), 900);
+        _diagnosticsView.Columns.Add(L("Severity", "Severity"), 90);
+        _diagnosticsView.Columns.Add(L("Line", "Line"), 60);
+        _diagnosticsView.Columns.Add(L("Column", "Column"), 70);
+        _diagnosticsView.Columns.Add(L("Message", "Message"), 900);
         diagnosticsTab.Controls.Add(_diagnosticsView);
 
-        var runtimeTab = new TabPage(L("����ʱ", "Runtime"));
+        var runtimeTab = new TabPage(L("Runtime", "Runtime"));
         _editorTabs.TabPages.Add(runtimeTab);
 
         _runtimeOutputTextBox = new RichTextBox
@@ -187,7 +187,7 @@ internal sealed class MainForm : Form
         runtimeTab.Controls.Add(_runtimeOutputTextBox);
 
         var statusStrip = new StatusStrip();
-        _statusLabel = new ToolStripStatusLabel(L("����", "Idle"));
+        _statusLabel = new ToolStripStatusLabel(L("Idle", "Idle"));
         statusStrip.Items.Add(_statusLabel);
         Controls.Add(statusStrip);
 
@@ -207,55 +207,55 @@ internal sealed class MainForm : Form
     private BindingList<BlockStep>? CurrentStepContainer => _stepContainerStack.Count == 0 ? null : _stepContainerStack.Peek().Steps;
     private bool IsAtRootStepContainer => _stepContainerStack.Count <= 1;
 
-    private string L(string zhHans, string english) => _useSimplifiedChinese ? zhHans : english;
+    private string L(string zhHans, string english) => _useSimplifiedChinese ? DesktopLocalization.Translate(english, zhHans) : english;
 
     private List<OptionItem<BlockEndpointTransport>> GetEndpointTransportOptions() => new()
     {
         new(BlockEndpointTransport.OscUdp, L("OSC UDP", "OSC UDP")),
-        new(BlockEndpointTransport.WsClient, L("WebSocket �ͻ���", "WebSocket Client")),
-        new(BlockEndpointTransport.WsServer, L("WebSocket �����", "WebSocket Server")),
+        new(BlockEndpointTransport.WsClient, L("WebSocket Client", "WebSocket Client")),
+        new(BlockEndpointTransport.WsServer, L("WebSocket Server", "WebSocket Server")),
         new(BlockEndpointTransport.Vrchat, "VRChat"),
     };
 
     private List<OptionItem<BlockEndpointMode>> GetEndpointModeOptions() => new()
     {
-        new(BlockEndpointMode.Input, L("����", "Input")),
-        new(BlockEndpointMode.Output, L("���", "Output")),
+        new(BlockEndpointMode.Input, L("Input", "Input")),
+        new(BlockEndpointMode.Output, L("Output", "Output")),
     };
 
     private List<OptionItem<BlockTriggerKind>> GetTriggerOptions() => new()
     {
-        new(BlockTriggerKind.Startup, L("���", "Startup")),
-        new(BlockTriggerKind.Receive, L("����", "Receive")),
-        new(BlockTriggerKind.VrchatAvatarChange, L("VRChat ģ���л�", "VRChat Avatar Change")),
-        new(BlockTriggerKind.VrchatParameter, L("VRChat �����仯", "VRChat Param")),
+        new(BlockTriggerKind.Startup, L("Startup", "Startup")),
+        new(BlockTriggerKind.Receive, L("Receive", "Receive")),
+        new(BlockTriggerKind.VrchatAvatarChange, L("VRChat Avatar Change", "VRChat Avatar Change")),
+        new(BlockTriggerKind.VrchatParameter, L("VRChat Param", "VRChat Param")),
     };
 
     private List<OptionItem<BlockStepKind>> GetStepKindOptions() => new()
     {
-        new(BlockStepKind.Log, L("日志", "Log")),
-        new(BlockStepKind.Store, L("存储", "Store")),
-        new(BlockStepKind.Send, L("发送", "Send")),
-        new(BlockStepKind.Stop, L("停止", "Stop")),
-        new(BlockStepKind.While, L("循环", "While")),
-        new(BlockStepKind.Break, L("跳出循环", "Break")),
-        new(BlockStepKind.Continue, L("继续下一轮", "Continue")),
-        new(BlockStepKind.VrchatParam, L("VRChat 参数", "VRChat Param")),
-        new(BlockStepKind.VrchatInput, L("VRChat 输入", "VRChat Input")),
-        new(BlockStepKind.VrchatChat, L("VRChat 聊天框", "VRChat Chatbox")),
-        new(BlockStepKind.VrchatTyping, L("VRChat 正在输入", "VRChat Typing")),
+        new(BlockStepKind.Log, L("Log", "Log")),
+        new(BlockStepKind.Store, L("Store", "Store")),
+        new(BlockStepKind.Send, L("Send", "Send")),
+        new(BlockStepKind.Stop, L("Stop", "Stop")),
+        new(BlockStepKind.While, L("While", "While")),
+        new(BlockStepKind.Break, L("Break", "Break")),
+        new(BlockStepKind.Continue, L("Continue", "Continue")),
+        new(BlockStepKind.VrchatParam, L("VRChat Param", "VRChat Param")),
+        new(BlockStepKind.VrchatInput, L("VRChat Input", "VRChat Input")),
+        new(BlockStepKind.VrchatChat, L("VRChat Chatbox", "VRChat Chatbox")),
+        new(BlockStepKind.VrchatTyping, L("VRChat Typing", "VRChat Typing")),
     };
 
     private List<OptionItem<BlockPayloadMode>> GetPayloadModeOptions() => new()
     {
-        new(BlockPayloadMode.None, L("��", "None")),
+        new(BlockPayloadMode.None, L("None", "None")),
         new(BlockPayloadMode.Args, "Args"),
         new(BlockPayloadMode.Body, "Body"),
     };
 
     private string FormatPayloadMode(BlockPayloadMode mode) => mode switch
     {
-        BlockPayloadMode.None => L("��", "None"),
+        BlockPayloadMode.None => L("None", "None"),
         BlockPayloadMode.Args => "Args",
         BlockPayloadMode.Body => "Body",
         _ => mode.ToString(),
@@ -283,7 +283,7 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             MaximumSize = new Size(1280, 0),
-            Text = L("Ŀǰ��ľҳ���ǵ�����������������������˵㡢�������Ͳ��裬Ȼ������ɵĽű�Ӧ�õ��ű�ҳ���ټ��������΢����", "Blocks is a one-way visual generator for now. Build endpoints, triggers, and steps here, then apply the generated script to the Script tab when you want to save or fine-tune it."),
+            Text = L("Blocks is a one-way visual generator for now. Build endpoints, triggers, and steps here, then apply the generated script to the Script tab when you want to save or fine-tune it.", "Blocks is a one-way visual generator for now. Build endpoints, triggers, and steps here, then apply the generated script to the Script tab when you want to save or fine-tune it."),
             ForeColor = Color.FromArgb(55, 55, 55),
             Margin = new Padding(0, 0, 0, 8),
         };
@@ -297,12 +297,12 @@ internal sealed class MainForm : Form
         };
         root.Controls.Add(toolbar, 0, 1);
 
-        toolbar.Controls.Add(CreateButton(L("��Ӷ˵�", "Add Endpoint"), (_, _) => AddEndpoint()));
-        toolbar.Controls.Add(CreateButton(L("��� VRChat �˵�", "Add VRChat Endpoint"), (_, _) => AddVrchatEndpoint()));
-        toolbar.Controls.Add(CreateButton(L("ɾ���˵�", "Remove Endpoint"), (_, _) => RemoveSelectedEndpoint()));
-        toolbar.Controls.Add(CreateButton(L("����ű�����ľ", "Import Script To Blocks"), (_, _) => ImportScriptToBlocks()));
-        toolbar.Controls.Add(CreateButton(L("Ԥ���ű�", "Preview Script"), (_, _) => UpdateBlocksPreview()));
-        toolbar.Controls.Add(CreateButton(L("Ӧ�õ��ű�", "Apply To Script"), (_, _) => ApplyBlocksToScript()));
+        toolbar.Controls.Add(CreateButton(L("Add Endpoint", "Add Endpoint"), (_, _) => AddEndpoint()));
+        toolbar.Controls.Add(CreateButton(L("Add VRChat Endpoint", "Add VRChat Endpoint"), (_, _) => AddVrchatEndpoint()));
+        toolbar.Controls.Add(CreateButton(L("Remove Endpoint", "Remove Endpoint"), (_, _) => RemoveSelectedEndpoint()));
+        toolbar.Controls.Add(CreateButton(L("Import Script To Blocks", "Import Script To Blocks"), (_, _) => ImportScriptToBlocks()));
+        toolbar.Controls.Add(CreateButton(L("Preview Script", "Preview Script"), (_, _) => UpdateBlocksPreview()));
+        toolbar.Controls.Add(CreateButton(L("Apply To Script", "Apply To Script"), (_, _) => ApplyBlocksToScript()));
 
         _blocksOuterSplit = new SplitContainer
         {
@@ -315,7 +315,7 @@ internal sealed class MainForm : Form
 
         var endpointsGroup = new GroupBox
         {
-            Text = L("�˵�", "Endpoints"),
+            Text = L("Endpoints", "Endpoints"),
             Dock = DockStyle.Fill,
             Padding = new Padding(8),
         };
@@ -323,14 +323,14 @@ internal sealed class MainForm : Form
 
         _endpointGrid = CreateGrid();
         _endpointGrid.DataSource = _endpointBindingSource;
-        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Name), HeaderText = L("����", "Name"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 18 });
-        _endpointGrid.Columns.Add(new DataGridViewComboBoxColumn { DataPropertyName = nameof(BlockEndpoint.Transport), HeaderText = L("����", "Transport"), DataSource = GetEndpointTransportOptions(), DisplayMember = nameof(OptionItem<BlockEndpointTransport>.Label), ValueMember = nameof(OptionItem<BlockEndpointTransport>.Value), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 16 });
-        _endpointGrid.Columns.Add(new DataGridViewComboBoxColumn { DataPropertyName = nameof(BlockEndpoint.Mode), HeaderText = L("ģʽ", "Mode"), DataSource = GetEndpointModeOptions(), DisplayMember = nameof(OptionItem<BlockEndpointMode>.Label), ValueMember = nameof(OptionItem<BlockEndpointMode>.Value), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
-        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Host), HeaderText = L("����", "Host"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 18 });
-        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Port), HeaderText = L("�˿�", "Port"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 10 });
-        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.InputPort), HeaderText = L("����˿�", "Input Port"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 10 });
-        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Path), HeaderText = L("·��", "Path"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
-        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Codec), HeaderText = L("����", "Codec"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Name), HeaderText = L("Name", "Name"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 18 });
+        _endpointGrid.Columns.Add(new DataGridViewComboBoxColumn { DataPropertyName = nameof(BlockEndpoint.Transport), HeaderText = L("Transport", "Transport"), DataSource = GetEndpointTransportOptions(), DisplayMember = nameof(OptionItem<BlockEndpointTransport>.Label), ValueMember = nameof(OptionItem<BlockEndpointTransport>.Value), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 16 });
+        _endpointGrid.Columns.Add(new DataGridViewComboBoxColumn { DataPropertyName = nameof(BlockEndpoint.Mode), HeaderText = L("Mode", "Mode"), DataSource = GetEndpointModeOptions(), DisplayMember = nameof(OptionItem<BlockEndpointMode>.Label), ValueMember = nameof(OptionItem<BlockEndpointMode>.Value), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Host), HeaderText = L("Host", "Host"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 18 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Port), HeaderText = L("Port", "Port"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 10 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.InputPort), HeaderText = L("Input Port", "Input Port"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 10 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Path), HeaderText = L("Path", "Path"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
+        _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Codec), HeaderText = L("Codec", "Codec"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
         endpointsGroup.Controls.Add(_endpointGrid);
 
         _blocksInnerSplit = new SplitContainer
@@ -351,7 +351,7 @@ internal sealed class MainForm : Form
         };
         _blocksInnerSplit.Panel1.Controls.Add(_blocksRuleSplit);
 
-        var rulesGroup = new GroupBox { Text = L("����", "Rules"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var rulesGroup = new GroupBox { Text = L("Rules", "Rules"), Dock = DockStyle.Fill, Padding = new Padding(8) };
         _blocksRuleSplit.Panel1.Controls.Add(rulesGroup);
 
         var rulesLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
@@ -374,14 +374,14 @@ internal sealed class MainForm : Form
         rulesLayout.Controls.Add(_rulesListBox, 0, 0);
 
         var ruleButtons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0) };
-        ruleButtons.Controls.Add(CreateButton(L("����������", "Add Startup"), (_, _) => AddRule(BlockTriggerKind.Startup)));
-        ruleButtons.Controls.Add(CreateButton(L("��ӽ��չ���", "Add Receive"), (_, _) => AddRule(BlockTriggerKind.Receive)));
-        ruleButtons.Controls.Add(CreateButton(L("���ģ���л�", "Add Avatar Change"), (_, _) => AddRule(BlockTriggerKind.VrchatAvatarChange)));
-        ruleButtons.Controls.Add(CreateButton(L("��Ӳ�������", "Add Param Trigger"), (_, _) => AddRule(BlockTriggerKind.VrchatParameter)));
-        ruleButtons.Controls.Add(CreateButton(L("����", "Move Up"), (_, _) => MoveSelectedRule(-1)));
-        ruleButtons.Controls.Add(CreateButton(L("����", "Move Down"), (_, _) => MoveSelectedRule(1)));
-        ruleButtons.Controls.Add(CreateButton(L("����", "Duplicate"), (_, _) => DuplicateSelectedRule()));
-        ruleButtons.Controls.Add(CreateButton(L("ɾ��", "Delete"), (_, _) => RemoveSelectedRule()));
+        ruleButtons.Controls.Add(CreateButton(L("Add Startup", "Add Startup"), (_, _) => AddRule(BlockTriggerKind.Startup)));
+        ruleButtons.Controls.Add(CreateButton(L("Add Receive", "Add Receive"), (_, _) => AddRule(BlockTriggerKind.Receive)));
+        ruleButtons.Controls.Add(CreateButton(L("Add Avatar Change", "Add Avatar Change"), (_, _) => AddRule(BlockTriggerKind.VrchatAvatarChange)));
+        ruleButtons.Controls.Add(CreateButton(L("Add Param Trigger", "Add Param Trigger"), (_, _) => AddRule(BlockTriggerKind.VrchatParameter)));
+        ruleButtons.Controls.Add(CreateButton(L("Move Up", "Move Up"), (_, _) => MoveSelectedRule(-1)));
+        ruleButtons.Controls.Add(CreateButton(L("Move Down", "Move Down"), (_, _) => MoveSelectedRule(1)));
+        ruleButtons.Controls.Add(CreateButton(L("Duplicate", "Duplicate"), (_, _) => DuplicateSelectedRule()));
+        ruleButtons.Controls.Add(CreateButton(L("Delete", "Delete"), (_, _) => RemoveSelectedRule()));
         rulesLayout.Controls.Add(ruleButtons, 0, 1);
 
         var rulesHint = new Label
@@ -389,7 +389,7 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             MaximumSize = new Size(420, 0),
-            Text = L("�����൱���¼���ջ���������ռ䲻��������ֱ���϶��ָ�����", "Rules are the block equivalent of event stacks. Drag the splitter if you want more room for this panel."),
+            Text = L("Rules are the block equivalent of event stacks. Drag the splitter if you want more room for this panel.", "Rules are the block equivalent of event stacks. Drag the splitter if you want more room for this panel."),
             ForeColor = Color.FromArgb(70, 70, 70),
             Margin = new Padding(0, 8, 0, 0),
         };
@@ -399,7 +399,7 @@ internal sealed class MainForm : Form
         editorLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 138));
         editorLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         _blocksRuleSplit.Panel2.Controls.Add(editorLayout);
-        var ruleGroup = new GroupBox { Text = L("��ǰ����", "Selected Rule"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var ruleGroup = new GroupBox { Text = L("Selected Rule", "Selected Rule"), Dock = DockStyle.Fill, Padding = new Padding(8) };
         editorLayout.Controls.Add(ruleGroup, 0, 0);
 
         var ruleLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 2 };
@@ -411,23 +411,23 @@ internal sealed class MainForm : Form
         ruleLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         ruleGroup.Controls.Add(ruleLayout);
 
-        ruleLayout.Controls.Add(CreateFieldLabel(L("������", "Trigger")), 0, 0);
+        ruleLayout.Controls.Add(CreateFieldLabel(L("Trigger", "Trigger")), 0, 0);
         _triggerComboBox = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = GetTriggerOptions(), DisplayMember = nameof(OptionItem<BlockTriggerKind>.Label), ValueMember = nameof(OptionItem<BlockTriggerKind>.Value), Margin = new Padding(0, 0, 12, 8) };
         ruleLayout.Controls.Add(_triggerComboBox, 1, 0);
 
-        ruleLayout.Controls.Add(CreateFieldLabel(L("�˵�", "Endpoint")), 2, 0);
+        ruleLayout.Controls.Add(CreateFieldLabel(L("Endpoint", "Endpoint")), 2, 0);
         _ruleEndpointTextBox = CreateFieldTextBox();
         ruleLayout.Controls.Add(_ruleEndpointTextBox, 3, 0);
 
-        ruleLayout.Controls.Add(CreateFieldLabel(L("��ַ", "Address")), 0, 1);
+        ruleLayout.Controls.Add(CreateFieldLabel(L("Address", "Address")), 0, 1);
         _ruleAddressTextBox = CreateFieldTextBox();
         ruleLayout.Controls.Add(_ruleAddressTextBox, 1, 1);
 
-        ruleLayout.Controls.Add(CreateFieldLabel(L("����", "When")), 2, 1);
+        ruleLayout.Controls.Add(CreateFieldLabel(L("When", "When")), 2, 1);
         _ruleWhenTextBox = CreateFieldTextBox();
         ruleLayout.Controls.Add(_ruleWhenTextBox, 3, 1);
 
-        var stepsGroup = new GroupBox { Text = L("����", "Steps"), Dock = DockStyle.Fill, Padding = new Padding(8), Margin = new Padding(0, 8, 0, 0) };
+        var stepsGroup = new GroupBox { Text = L("Steps", "Steps"), Dock = DockStyle.Fill, Padding = new Padding(8), Margin = new Padding(0, 8, 0, 0) };
         editorLayout.Controls.Add(stepsGroup, 0, 1);
 
         var stepsLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
@@ -455,7 +455,7 @@ internal sealed class MainForm : Form
         };
         stepsLayout.Controls.Add(stepsSplit, 0, 1);
 
-        var stepsStackGroup = new GroupBox { Text = L("����ջ", "Stack"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var stepsStackGroup = new GroupBox { Text = L("Stack", "Stack"), Dock = DockStyle.Fill, Padding = new Padding(8) };
         stepsSplit.Panel1.Controls.Add(stepsStackGroup);
 
         _stepsListBox = new ListBox
@@ -471,7 +471,7 @@ internal sealed class MainForm : Form
         };
         stepsStackGroup.Controls.Add(_stepsListBox);
 
-        var stepEditorGroup = new GroupBox { Text = L("��ǰ����", "Selected Step"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var stepEditorGroup = new GroupBox { Text = L("Selected Step", "Selected Step"), Dock = DockStyle.Fill, Padding = new Padding(8) };
         stepsSplit.Panel2.Controls.Add(stepEditorGroup);
 
         var stepEditorLayout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 4, RowCount = 3 };
@@ -484,50 +484,50 @@ internal sealed class MainForm : Form
         stepEditorLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         stepEditorGroup.Controls.Add(stepEditorLayout);
 
-        stepEditorLayout.Controls.Add(CreateFieldLabel(L("����", "Step")), 0, 0);
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("Step", "Step")), 0, 0);
         _stepKindComboBox = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = GetStepKindOptions(), DisplayMember = nameof(OptionItem<BlockStepKind>.Label), ValueMember = nameof(OptionItem<BlockStepKind>.Value), Margin = new Padding(0, 0, 12, 8) };
         stepEditorLayout.Controls.Add(_stepKindComboBox, 1, 0);
 
-        stepEditorLayout.Controls.Add(CreateFieldLabel(L("Ŀ��", "Target")), 2, 0);
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("Target", "Target")), 2, 0);
         _stepTargetTextBox = CreateFieldTextBox();
         stepEditorLayout.Controls.Add(_stepTargetTextBox, 3, 0);
 
-        stepEditorLayout.Controls.Add(CreateFieldLabel(L("ֵ", "Value")), 0, 1);
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("Value", "Value")), 0, 1);
         _stepValueTextBox = CreateFieldTextBox();
         stepEditorLayout.Controls.Add(_stepValueTextBox, 1, 1);
 
-        stepEditorLayout.Controls.Add(CreateFieldLabel(L("����", "Payload")), 2, 1);
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("Payload", "Payload")), 2, 1);
         _stepPayloadComboBox = new ComboBox { Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList, DataSource = GetPayloadModeOptions(), DisplayMember = nameof(OptionItem<BlockPayloadMode>.Label), ValueMember = nameof(OptionItem<BlockPayloadMode>.Value), Margin = new Padding(0, 0, 0, 8) };
         stepEditorLayout.Controls.Add(_stepPayloadComboBox, 3, 1);
 
-        stepEditorLayout.Controls.Add(CreateFieldLabel(L("����", "Extra")), 0, 2);
+        stepEditorLayout.Controls.Add(CreateFieldLabel(L("Extra", "Extra")), 0, 2);
         _stepExtraTextBox = CreateFieldTextBox();
         stepEditorLayout.Controls.Add(_stepExtraTextBox, 1, 2);
         stepEditorLayout.SetColumnSpan(_stepExtraTextBox, 3);
 
         var stepButtons = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0, 8, 0, 0) };
-        stepButtons.Controls.Add(CreateButton(L("添加日志", "Add Log"), (_, _) => AddStep(BlockStepKind.Log)));
-        stepButtons.Controls.Add(CreateButton(L("添加存储", "Add Store"), (_, _) => AddStep(BlockStepKind.Store)));
-        stepButtons.Controls.Add(CreateButton(L("添加发送", "Add Send"), (_, _) => AddStep(BlockStepKind.Send)));
-        stepButtons.Controls.Add(CreateButton(L("添加循环", "Add While"), (_, _) => AddStep(BlockStepKind.While)));
-        stepButtons.Controls.Add(CreateButton(L("添加跳出", "Add Break"), (_, _) => AddStep(BlockStepKind.Break)));
-        stepButtons.Controls.Add(CreateButton(L("添加继续", "Add Continue"), (_, _) => AddStep(BlockStepKind.Continue)));
-        stepButtons.Controls.Add(CreateButton(L("添加停止", "Add Stop"), (_, _) => AddStep(BlockStepKind.Stop)));
-        stepButtons.Controls.Add(CreateButton(L("添加 VRChat 参数", "Add VRChat Param"), (_, _) => AddStep(BlockStepKind.VrchatParam)));
-        stepButtons.Controls.Add(CreateButton(L("添加 VRChat 输入", "Add VRChat Input"), (_, _) => AddStep(BlockStepKind.VrchatInput)));
-        stepButtons.Controls.Add(CreateButton(L("添加 VRChat 聊天", "Add VRChat Chat"), (_, _) => AddStep(BlockStepKind.VrchatChat)));
-        stepButtons.Controls.Add(CreateButton(L("添加 VRChat 输入状态", "Add VRChat Typing"), (_, _) => AddStep(BlockStepKind.VrchatTyping)));
-        _stepEnterBodyButton = CreateButton(L("进入循环体", "Enter Body"), (_, _) => EnterSelectedStepBody());
+        stepButtons.Controls.Add(CreateButton(L("Add Log", "Add Log"), (_, _) => AddStep(BlockStepKind.Log)));
+        stepButtons.Controls.Add(CreateButton(L("Add Store", "Add Store"), (_, _) => AddStep(BlockStepKind.Store)));
+        stepButtons.Controls.Add(CreateButton(L("Add Send", "Add Send"), (_, _) => AddStep(BlockStepKind.Send)));
+        stepButtons.Controls.Add(CreateButton(L("Add While", "Add While"), (_, _) => AddStep(BlockStepKind.While)));
+        stepButtons.Controls.Add(CreateButton(L("Add Break", "Add Break"), (_, _) => AddStep(BlockStepKind.Break)));
+        stepButtons.Controls.Add(CreateButton(L("Add Continue", "Add Continue"), (_, _) => AddStep(BlockStepKind.Continue)));
+        stepButtons.Controls.Add(CreateButton(L("Add Stop", "Add Stop"), (_, _) => AddStep(BlockStepKind.Stop)));
+        stepButtons.Controls.Add(CreateButton(L("Add VRChat Param", "Add VRChat Param"), (_, _) => AddStep(BlockStepKind.VrchatParam)));
+        stepButtons.Controls.Add(CreateButton(L("Add VRChat Input", "Add VRChat Input"), (_, _) => AddStep(BlockStepKind.VrchatInput)));
+        stepButtons.Controls.Add(CreateButton(L("Add VRChat Chat", "Add VRChat Chat"), (_, _) => AddStep(BlockStepKind.VrchatChat)));
+        stepButtons.Controls.Add(CreateButton(L("Add VRChat Typing", "Add VRChat Typing"), (_, _) => AddStep(BlockStepKind.VrchatTyping)));
+        _stepEnterBodyButton = CreateButton(L("Enter Body", "Enter Body"), (_, _) => EnterSelectedStepBody());
         stepButtons.Controls.Add(_stepEnterBodyButton);
-        _stepBackButton = CreateButton(L("返回上一层", "Back"), (_, _) => ExitStepBody());
+        _stepBackButton = CreateButton(L("Back", "Back"), (_, _) => ExitStepBody());
         stepButtons.Controls.Add(_stepBackButton);
-        stepButtons.Controls.Add(CreateButton(L("上移", "Move Up"), (_, _) => MoveSelectedStep(-1)));
-        stepButtons.Controls.Add(CreateButton(L("下移", "Move Down"), (_, _) => MoveSelectedStep(1)));
-        stepButtons.Controls.Add(CreateButton(L("复制", "Duplicate"), (_, _) => DuplicateSelectedStep()));
-        stepButtons.Controls.Add(CreateButton(L("删除", "Delete"), (_, _) => RemoveSelectedStep()));
+        stepButtons.Controls.Add(CreateButton(L("Move Up", "Move Up"), (_, _) => MoveSelectedStep(-1)));
+        stepButtons.Controls.Add(CreateButton(L("Move Down", "Move Down"), (_, _) => MoveSelectedStep(1)));
+        stepButtons.Controls.Add(CreateButton(L("Duplicate", "Duplicate"), (_, _) => DuplicateSelectedStep()));
+        stepButtons.Controls.Add(CreateButton(L("Delete", "Delete"), (_, _) => RemoveSelectedStep()));
         stepsLayout.Controls.Add(stepButtons, 0, 2);
 
-        var previewGroup = new GroupBox { Text = L("���ɽű�Ԥ��", "Generated Script Preview"), Dock = DockStyle.Fill, Padding = new Padding(8) };
+        var previewGroup = new GroupBox { Text = L("Generated Script Preview", "Generated Script Preview"), Dock = DockStyle.Fill, Padding = new Padding(8) };
         _blocksInnerSplit.Panel2.Controls.Add(previewGroup);
 
         _blocksPreviewTextBox = new TextBox
@@ -592,7 +592,7 @@ internal sealed class MainForm : Form
         _pathTextBox.Text = dialog.FileName;
         _editorTextBox.Text = await File.ReadAllTextAsync(dialog.FileName);
         _editorTabs.SelectedTab = _scriptTab;
-        UpdateStatus(L("�ѽ��ű����ص��ű�ҳ����ľ�ݸ�δ�Ķ���", "Loaded script into Script tab. Blocks draft was left unchanged."));
+        UpdateStatus(L("Loaded script into Script tab. Blocks draft was left unchanged.", "Loaded script into Script tab. Blocks draft was left unchanged."));
         await CheckAsync();
     }
 
@@ -601,13 +601,13 @@ internal sealed class MainForm : Form
         var path = _pathTextBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
         {
-            UpdateStatus(L("����ѡ��ű��ļ�", "Select a script file first"));
+            UpdateStatus(L("Select a script file first", "Select a script file first"));
             return;
         }
 
         _editorTextBox.Text = await File.ReadAllTextAsync(path);
         _editorTabs.SelectedTab = _scriptTab;
-        UpdateStatus(L("�ѽ��ű����¼��ص��ű�ҳ����ľ�ݸ�δ�Ķ���", "Reloaded script into Script tab. Blocks draft was left unchanged."));
+        UpdateStatus(L("Reloaded script into Script tab. Blocks draft was left unchanged.", "Reloaded script into Script tab. Blocks draft was left unchanged."));
         await CheckAsync();
     }
 
@@ -633,14 +633,14 @@ internal sealed class MainForm : Form
             _editorTextBox.Text = source;
         }
 
-        UpdateStatus(L("�ѱ���", "Saved"));
+        UpdateStatus(L("Saved", "Saved"));
     }
 
     private Task CheckAsync()
     {
         var result = _controller.Compile(GetCurrentSource());
         RenderDiagnostics(result);
-        UpdateStatus(result.HasErrors ? L("���������Ϣ", "Diagnostics found") : L("����", "Ready"));
+        UpdateStatus(result.HasErrors ? L("Diagnostics found", "Diagnostics found") : L("Ready", "Ready"));
         return Task.CompletedTask;
     }
     private async Task StartAsync()
@@ -655,7 +655,7 @@ internal sealed class MainForm : Form
             {
                 _stopButton.Enabled = false;
                 _startButton.Enabled = true;
-                _statusLabel.Text = L("����ʧ��", "Compile failed");
+                _statusLabel.Text = L("Compile failed", "Compile failed");
                 return;
             }
 
@@ -664,8 +664,8 @@ internal sealed class MainForm : Form
         }
         catch (Exception ex)
         {
-            AppendRuntimeOutput($"{L("����ʱ���ʧ��", "Runtime start failed")}: {ex.Message}");
-            UpdateStatus(L("���ʧ��", "Start failed"));
+            AppendRuntimeOutput($"{L("Runtime start failed", "Runtime start failed")}: {ex.Message}");
+            UpdateStatus(L("Start failed", "Start failed"));
             _startButton.Enabled = true;
             _stopButton.Enabled = false;
         }
@@ -681,7 +681,7 @@ internal sealed class MainForm : Form
         try
         {
             await _controller.StopAsync();
-            AppendRuntimeOutput(L("����ʱ��ֹͣ��", "Runtime stopped."));
+            AppendRuntimeOutput(L("Runtime stopped.", "Runtime stopped."));
             _startButton.Enabled = true;
             _stopButton.Enabled = false;
         }
@@ -709,10 +709,10 @@ internal sealed class MainForm : Form
 
             if (result.Diagnostics.Count == 0)
             {
-                var item = new ListViewItem(L("��Ϣ", "Info"));
+                var item = new ListViewItem(L("Info", "Info"));
                 item.SubItems.Add("-");
                 item.SubItems.Add("-");
-                item.SubItems.Add(L("û�������Ϣ��", "No diagnostics."));
+                item.SubItems.Add(L("No diagnostics.", "No diagnostics."));
                 item.ForeColor = Color.SeaGreen;
                 _diagnosticsView.Items.Add(item);
             }
@@ -781,7 +781,7 @@ internal sealed class MainForm : Form
     {
         if (_blocks.Endpoints.Any(endpoint => endpoint.Transport == BlockEndpointTransport.Vrchat))
         {
-            UpdateStatus(L("�Ѿ����� VRChat �˵㡣", "VRChat endpoint already exists."));
+            UpdateStatus(L("VRChat endpoint already exists.", "VRChat endpoint already exists."));
             return;
         }
 
@@ -1286,7 +1286,7 @@ internal sealed class MainForm : Form
         UpdateBlocksPreview();
         _editorTextBox.Text = _blocksPreviewTextBox.Text;
         _editorTabs.SelectedTab = _scriptTab;
-        UpdateStatus(L("�ѽ����ɽű�Ӧ�õ��ű�ҳ��", "Applied generated script to the Script tab."));
+        UpdateStatus(L("Applied generated script to the Script tab.", "Applied generated script to the Script tab."));
     }
 
     private void InitializeBlockSplitters()
@@ -1376,7 +1376,7 @@ internal sealed class MainForm : Form
         RenderDiagnostics(result);
         if (result.HasErrors)
         {
-            UpdateStatus(L("���뵽��ľǰ�����޸��ű�������⡣", "Fix script diagnostics before importing into Blocks."));
+            UpdateStatus(L("Fix script diagnostics before importing into Blocks.", "Fix script diagnostics before importing into Blocks."));
             return;
         }
 
@@ -1387,17 +1387,17 @@ internal sealed class MainForm : Form
 
         if (imported.Warnings.Count == 0)
         {
-            UpdateStatus(L("�ѽ��ű����뵽��ľ��", "Imported script into Blocks."));
+            UpdateStatus(L("Imported script into Blocks.", "Imported script into Blocks."));
             return;
         }
 
-        AppendRuntimeOutput(L("��ľ����˵����", "Block import notes:"));
+        AppendRuntimeOutput(L("Block import notes:", "Block import notes:"));
         foreach (var warning in imported.Warnings)
         {
             AppendRuntimeOutput($"- {warning}");
         }
 
-        UpdateStatus(_useSimplifiedChinese ? $"�ѵ��룬������ {imported.Warnings.Count} ��˵����" : $"Imported with {imported.Warnings.Count} note(s).");
+        UpdateStatus(_useSimplifiedChinese ? $"已导入，并附带 {imported.Warnings.Count} 条说明。" : $"Imported with {imported.Warnings.Count} note(s).");
     }
 
     private void LoadBlocksDocument(BlockDocument document)
@@ -1474,22 +1474,22 @@ internal sealed class MainForm : Form
 
         var title = rule.Trigger switch
         {
-            BlockTriggerKind.Startup => L("��Ӧ�����ʱ", "When app starts"),
-            BlockTriggerKind.Receive => _useSimplifiedChinese ? $"���� {FormatDisplayValue(rule.EndpointName, "�˵�")} ���յ���Ϣʱ" : $"When receive from {FormatDisplayValue(rule.EndpointName, "endpoint")}",
-            BlockTriggerKind.VrchatAvatarChange => L("�� VRChat ģ���л�ʱ", "When VRChat avatar changes"),
-            BlockTriggerKind.VrchatParameter => _useSimplifiedChinese ? $"�� VRChat ���� {FormatDisplayValue(rule.EndpointName, "����")} �仯ʱ" : $"When VRChat param {FormatDisplayValue(rule.EndpointName, "param")} changes",
-            _ => L("����", "Rule"),
+            BlockTriggerKind.Startup => L("When app starts", "When app starts"),
+            BlockTriggerKind.Receive => _useSimplifiedChinese ? $"当从 {FormatDisplayValue(rule.EndpointName, "端点")} 接收到消息时" : $"When receive from {FormatDisplayValue(rule.EndpointName, "endpoint")}",
+            BlockTriggerKind.VrchatAvatarChange => L("When VRChat avatar changes", "When VRChat avatar changes"),
+            BlockTriggerKind.VrchatParameter => _useSimplifiedChinese ? $"当 VRChat 参数 {FormatDisplayValue(rule.EndpointName, "参数")} 变化时" : $"When VRChat param {FormatDisplayValue(rule.EndpointName, "param")} changes",
+            _ => L("Rule", "Rule"),
         };
 
         var detail = rule.Trigger switch
         {
-            BlockTriggerKind.Receive when string.IsNullOrWhiteSpace(rule.Address) => (string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("�޹�������", "No filter") : rule.WhenExpression),
-            BlockTriggerKind.Receive => (_useSimplifiedChinese ? $"��ַ {rule.Address}" : $"Address {rule.Address}") + (string.IsNullOrWhiteSpace(rule.WhenExpression) ? string.Empty : (_useSimplifiedChinese ? $" �� {rule.WhenExpression}" : $" and {rule.WhenExpression}")),
-            BlockTriggerKind.VrchatAvatarChange => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("���� /avatar/change", "Listening to /avatar/change") : rule.WhenExpression,
-            BlockTriggerKind.VrchatParameter => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("���� /avatar/parameters/...", "Listening to /avatar/parameters/...") : rule.WhenExpression,
-            _ => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("�޹�������", "No filter") : rule.WhenExpression,
+            BlockTriggerKind.Receive when string.IsNullOrWhiteSpace(rule.Address) => (string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("No filter", "No filter") : rule.WhenExpression),
+            BlockTriggerKind.Receive => (_useSimplifiedChinese ? $"地址 {rule.Address}" : $"Address {rule.Address}") + (string.IsNullOrWhiteSpace(rule.WhenExpression) ? string.Empty : (_useSimplifiedChinese ? $" 且 {rule.WhenExpression}" : $" and {rule.WhenExpression}")),
+            BlockTriggerKind.VrchatAvatarChange => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("Listening to /avatar/change", "Listening to /avatar/change") : rule.WhenExpression,
+            BlockTriggerKind.VrchatParameter => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("Listening to /avatar/parameters/...", "Listening to /avatar/parameters/...") : rule.WhenExpression,
+            _ => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("No filter", "No filter") : rule.WhenExpression,
         };
-        var steps = rule.Steps.Count == 0 ? L("��û�в���", "No steps yet") : (_useSimplifiedChinese ? $"{rule.Steps.Count} ��" : $"{rule.Steps.Count} step(s)");
+        var steps = rule.Steps.Count == 0 ? L("No steps yet", "No steps yet") : (_useSimplifiedChinese ? $"{rule.Steps.Count} 步" : $"{rule.Steps.Count} step(s)");
 
         TextRenderer.DrawText(e.Graphics, title, Font, new Rectangle(bounds.X + 10, bounds.Y + 8, bounds.Width - 20, 18), titleColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
         TextRenderer.DrawText(e.Graphics, detail, Font, new Rectangle(bounds.X + 10, bounds.Y + 28, bounds.Width - 20, 16), bodyColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
@@ -1537,28 +1537,28 @@ internal sealed class MainForm : Form
             BlockStepKind.Log => _useSimplifiedChinese ? $"日志 {FormatDisplayValue(step.Target, "info")}" : $"Log {FormatDisplayValue(step.Target, "info")}",
             BlockStepKind.Store => _useSimplifiedChinese ? $"存储 {FormatDisplayValue(step.Target, "状态")}" : $"Store {FormatDisplayValue(step.Target, "state")}",
             BlockStepKind.Send => _useSimplifiedChinese ? $"发送 {FormatDisplayValue(step.Target, "端点")}" : $"Send {FormatDisplayValue(step.Target, "endpoint")}",
-            BlockStepKind.While => L("循环", "While"),
-            BlockStepKind.Break => L("跳出循环", "Break"),
-            BlockStepKind.Continue => L("继续下一轮", "Continue"),
-            BlockStepKind.Stop => L("停止链", "Stop chain"),
+            BlockStepKind.While => L("While", "While"),
+            BlockStepKind.Break => L("Break", "Break"),
+            BlockStepKind.Continue => L("Continue", "Continue"),
+            BlockStepKind.Stop => L("Stop chain", "Stop chain"),
             BlockStepKind.VrchatParam => _useSimplifiedChinese ? $"VRChat 参数 {FormatDisplayValue(step.Target, "参数")}" : $"VRChat param {FormatDisplayValue(step.Target, "param")}",
             BlockStepKind.VrchatInput => _useSimplifiedChinese ? $"VRChat 输入 {FormatDisplayValue(step.Target, "输入")}" : $"VRChat input {FormatDisplayValue(step.Target, "input")}",
-            BlockStepKind.VrchatChat => L("VRChat 聊天框", "VRChat Chatbox"),
-            BlockStepKind.VrchatTyping => L("VRChat 正在输入", "VRChat Typing"),
+            BlockStepKind.VrchatChat => L("VRChat Chatbox", "VRChat Chatbox"),
+            BlockStepKind.VrchatTyping => L("VRChat Typing", "VRChat Typing"),
             _ => step.Kind.ToString(),
         };
         var detail = step.Kind switch
         {
-            BlockStepKind.Log => FormatDisplayValue(step.Value, L("消息", "message")),
-            BlockStepKind.Store => FormatDisplayValue(step.Value, L("表达式", "expression")),
-            BlockStepKind.Send => $"{FormatDisplayValue(step.Value, "/address")} | {FormatPayloadMode(step.PayloadMode)} | {FormatDisplayValue(step.Extra, L("负载", "payload"))}",
+            BlockStepKind.Log => FormatDisplayValue(step.Value, L("message", "message")),
+            BlockStepKind.Store => FormatDisplayValue(step.Value, L("expression", "expression")),
+            BlockStepKind.Send => $"{FormatDisplayValue(step.Value, "/address")} | {FormatPayloadMode(step.PayloadMode)} | {FormatDisplayValue(step.Extra, L("payload", "payload"))}",
             BlockStepKind.While => _useSimplifiedChinese ? $"条件 {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} 个子步骤" : $"Condition {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} child step(s)",
-            BlockStepKind.Break => L("立刻跳出当前循环", "Exit the current loop immediately"),
-            BlockStepKind.Continue => L("跳到当前循环的下一轮", "Skip to the next loop iteration"),
-            BlockStepKind.Stop => L("立即结束当前规则链", "End current rule chain immediately"),
+            BlockStepKind.Break => L("Exit the current loop immediately", "Exit the current loop immediately"),
+            BlockStepKind.Continue => L("Skip to the next loop iteration", "Skip to the next loop iteration"),
+            BlockStepKind.Stop => L("End current rule chain immediately", "End current rule chain immediately"),
             BlockStepKind.VrchatParam => FormatDisplayValue(step.Value, "0"),
             BlockStepKind.VrchatInput => FormatDisplayValue(step.Value, "1"),
-            BlockStepKind.VrchatChat => string.IsNullOrWhiteSpace(step.Extra) ? FormatDisplayValue(step.Value, L("聊天文本", "chat text")) : $"{FormatDisplayValue(step.Value, L("聊天文本", "chat text"))} | {step.Extra}",
+            BlockStepKind.VrchatChat => string.IsNullOrWhiteSpace(step.Extra) ? FormatDisplayValue(step.Value, L("chat text", "chat text")) : $"{FormatDisplayValue(step.Value, L("chat text", "chat text"))} | {step.Extra}",
             BlockStepKind.VrchatTyping => FormatDisplayValue(step.Value, "true"),
             _ => string.Empty,
         };
@@ -1577,24 +1577,24 @@ internal sealed class MainForm : Form
         var step = SelectedStep;
         if (step is null)
         {
-            _stepHintLabel.Text = L("选择一个步骤后即可编辑。发送步骤使用 目标=端点，值=地址，负载=args/body，附加=负载内容。循环步骤用 值=条件，再通过“进入循环体”编辑子步骤。", "Select a step to edit it. Send steps use Target = endpoint, Value = address, Payload = args/body, Extra = payload content. While steps use Value = condition, then Enter Body to edit child steps.");
+            _stepHintLabel.Text = L("Select a step to edit it. Send steps use Target = endpoint, Value = address, Payload = args/body, Extra = payload content. While steps use Value = condition, then Enter Body to edit child steps.", "Select a step to edit it. Send steps use Target = endpoint, Value = address, Payload = args/body, Extra = payload content. While steps use Value = condition, then Enter Body to edit child steps.");
             return;
         }
 
         _stepHintLabel.Text = step.Kind switch
         {
-            BlockStepKind.Log => L("日志：目标 = 日志级别（info/warn/error/debug），值 = 文本或表达式。", "Log: Target = log level (info/warn/error/debug), Value = text or expression."),
-            BlockStepKind.Store => L("存储：目标 = 状态名，值 = 事件之间需要保留的表达式。", "Store: Target = state name, Value = expression to keep between events."),
-            BlockStepKind.Send => L("发送：目标 = 端点名，值 = 地址，负载 = Args 或 Body，附加 = 负载内容。对于 args，你可以直接输入 1, 2, 3，生成器会自动包成 [[...]]。", "Send: Target = endpoint name, Value = address, Payload = Args or Body, Extra = payload content. For args you can type 1, 2, 3 and the generator will wrap it into [[...]]."),
-            BlockStepKind.While => L("循环：值 = 条件表达式，例如 state(\"count\") < 3。选中后点“进入循环体”来编辑子步骤。", "While: Value = condition expression, for example state(\"count\") < 3. Select it and click Enter Body to edit child steps."),
-            BlockStepKind.Break => L("跳出循环：立即结束当前 while。其他字段会被忽略。", "Break: exits the current while immediately. Other fields are ignored."),
-            BlockStepKind.Continue => L("继续下一轮：跳过当前循环余下步骤，进入下一轮。其他字段会被忽略。", "Continue: skips the rest of the current loop iteration. Other fields are ignored."),
-            BlockStepKind.Stop => L("停止：立即结束当前规则链。其他字段会被忽略。", "Stop: ends the current rule chain immediately. Other fields are ignored."),
-            BlockStepKind.VrchatParam => L("VRChat 参数：目标 = Avatar 参数名，值 = 要写入的值。会生成 vrchat.param。", "VRChat Param: Target = avatar parameter name, Value = value to write. Generates vrchat.param."),
-            BlockStepKind.VrchatInput => L("VRChat 输入：目标 = 输入名，例如 Jump / Vertical，值 = 要发送的值。", "VRChat Input: Target = input name such as Jump / Vertical, Value = value to send."),
-            BlockStepKind.VrchatChat => L("VRChat 聊天框：值 = 文本，附加 = 例如 send=true notify=false。", "VRChat Chatbox: Value = text, Extra = options like send=true notify=false."),
-            BlockStepKind.VrchatTyping => L("VRChat 正在输入：值 = true 或 false。", "VRChat Typing: Value = true or false."),
-            _ => L("编辑当前选中的步骤。", "Edit the selected step.")
+            BlockStepKind.Log => L("Log: Target = log level (info/warn/error/debug), Value = text or expression.", "Log: Target = log level (info/warn/error/debug), Value = text or expression."),
+            BlockStepKind.Store => L("Store: Target = state name, Value = expression to keep between events.", "Store: Target = state name, Value = expression to keep between events."),
+            BlockStepKind.Send => L("Send: Target = endpoint name, Value = address, Payload = Args or Body, Extra = payload content. For args you can type 1, 2, 3 and the generator will wrap it into [[...]].", "Send: Target = endpoint name, Value = address, Payload = Args or Body, Extra = payload content. For args you can type 1, 2, 3 and the generator will wrap it into [[...]]."),
+            BlockStepKind.While => L("While: Value = condition expression, for example state(\"count\") < 3. Select it and click Enter Body to edit child steps.", "While: Value = condition expression, for example state(\"count\") < 3. Select it and click Enter Body to edit child steps."),
+            BlockStepKind.Break => L("Break: exits the current while immediately. Other fields are ignored.", "Break: exits the current while immediately. Other fields are ignored."),
+            BlockStepKind.Continue => L("Continue: skips the rest of the current loop iteration. Other fields are ignored.", "Continue: skips the rest of the current loop iteration. Other fields are ignored."),
+            BlockStepKind.Stop => L("Stop: ends the current rule chain immediately. Other fields are ignored.", "Stop: ends the current rule chain immediately. Other fields are ignored."),
+            BlockStepKind.VrchatParam => L("VRChat Param: Target = avatar parameter name, Value = value to write. Generates vrchat.param.", "VRChat Param: Target = avatar parameter name, Value = value to write. Generates vrchat.param."),
+            BlockStepKind.VrchatInput => L("VRChat Input: Target = input name such as Jump / Vertical, Value = value to send.", "VRChat Input: Target = input name such as Jump / Vertical, Value = value to send."),
+            BlockStepKind.VrchatChat => L("VRChat Chatbox: Value = text, Extra = options like send=true notify=false.", "VRChat Chatbox: Value = text, Extra = options like send=true notify=false."),
+            BlockStepKind.VrchatTyping => L("VRChat Typing: Value = true or false.", "VRChat Typing: Value = true or false."),
+            _ => L("Edit the selected step.", "Edit the selected step.")
         };
     }
 
