@@ -242,6 +242,69 @@ on receive wsIn when msg.address == "/hello" [
         Assert.Equal(42d, Convert.ToDouble(log.Value));
     }
 
+    [Fact]
+    public async Task DglabSocket_Duplex_BindsAndSendsCommand()
+    {
+        var port = GetFreeTcpPort();
+        using var listener = new HttpListener();
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/socket/");
+
+        try
+        {
+            listener.Start();
+        }
+        catch (HttpListenerException ex) when (ex.NativeErrorCode == 6)
+        {
+            throw new SkipException("HttpListener cannot start in this sandbox: invalid handle.");
+        }
+
+        var received = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var serverTask = Task.Run(async () =>
+        {
+            var context = await listener.GetContextAsync();
+            var webSocketContext = await context.AcceptWebSocketAsync(null);
+            await SendWebSocketTextAsync(webSocketContext.WebSocket, "{\"type\":\"bind\",\"clientId\":\"terminal-id\",\"targetId\":\"\",\"message\":\"targetId\"}");
+            await SendWebSocketTextAsync(webSocketContext.WebSocket, "{\"type\":\"bind\",\"clientId\":\"terminal-id\",\"targetId\":\"app-id\",\"message\":\"200\"}");
+            received.SetResult(await ReceiveWebSocketTextAsync(webSocketContext.WebSocket));
+            webSocketContext.WebSocket.Dispose();
+        });
+
+        var plan = new RuntimePlan(
+            [new RuntimeEndpointPlan("dglab", "dglab.socket", [
+                new RuntimePropertyPlan("mode", new RuntimeIdentifierPlan("duplex")),
+                new RuntimePropertyPlan("host", new RuntimeStringPlan("127.0.0.1")),
+                new RuntimePropertyPlan("port", new RuntimeNumberPlan(port)),
+                new RuntimePropertyPlan("path", new RuntimeStringPlan("/socket")),
+                new RuntimePropertyPlan("codec", new RuntimeIdentifierPlan("json")),
+                new RuntimePropertyPlan("heartbeatIntervalMs", new RuntimeNumberPlan(0))
+            ])],
+            [],
+            [new RuntimeRulePlan(
+                0,
+                new RuntimeReceiveTriggerPlan("dglab"),
+                new RuntimeBinaryPlan(
+                    new RuntimeCallPlan(new RuntimeIdentifierPlan("body"), [new RuntimeStringPlan("message")]),
+                    "==",
+                    new RuntimeStringPlan("200")),
+                [new RuntimeTransportSendPlan(
+                    "dglab",
+                    new RuntimeMessagePlan(null, null, new RuntimeStringPlan("strength-1+2+50"), null, []))])],
+            []);
+        await using var engine = new RuntimeEngine(plan);
+        await using var host = new RuntimeHost(engine);
+
+        await host.StartAsync();
+        await WaitForAsync(() => received.Task.IsCompleted, 3000);
+        await serverTask;
+
+        using var document = System.Text.Json.JsonDocument.Parse(await received.Task);
+        var root = document.RootElement;
+        Assert.Equal("msg", root.GetProperty("type").GetString());
+        Assert.Equal("terminal-id", root.GetProperty("clientId").GetString());
+        Assert.Equal("app-id", root.GetProperty("targetId").GetString());
+        Assert.Equal("strength-1+2+50", root.GetProperty("message").GetString());
+    }
+
     private static async Task WaitForAsync(Func<bool> predicate, int timeoutMs = 3000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
@@ -258,7 +321,13 @@ on receive wsIn when msg.address == "/hello" [
         Assert.True(predicate(), "Condition was not met before timeout.");
     }
 
-    private static async Task<string> ReceiveWebSocketTextAsync(ClientWebSocket socket, int timeoutMs = 3000)
+    private static Task SendWebSocketTextAsync(WebSocket socket, string text)
+    {
+        var payload = Encoding.UTF8.GetBytes(text);
+        return socket.SendAsync(payload, WebSocketMessageType.Text, true, CancellationToken.None);
+    }
+
+    private static async Task<string> ReceiveWebSocketTextAsync(WebSocket socket, int timeoutMs = 3000)
     {
         using var cts = new CancellationTokenSource(timeoutMs);
         var buffer = new byte[16 * 1024];

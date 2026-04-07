@@ -109,6 +109,7 @@ The current Blockly page is no longer only a blank prototype. It includes these 
 - `VRChat startup chatbox`: declare `vrchat.endpoint`, then send a Chatbox message on startup.
 - `VRChat param to input`: declare `vrchat.endpoint`, then map a VRChat avatar parameter event to a VRChat input.
 
+DG-LAB Socket and DG-LAB BLE are intentionally not exposed as Blockly script blocks. They belong to the DesktopHost `DGLabConnection` tab so device sessions can run beside script runtime instead of being generated into `.osccontrol` scripts.
 When the WebView2 host is enabled, Blockly changes debounce and auto-sync generated `.osccontrol` text back to the desktop host. While the `Blocks` tab is selected, desktop `Check`, `Save`, `Package App...`, and `Start` use the latest generated Blockly script.
 
 Saving from the `Blocks` tab also writes a `<script>.osccontrol.blocks.json` sidecar file. Opening or reloading the matching `.osccontrol` file restores that sidecar into the Blockly workspace when it exists.

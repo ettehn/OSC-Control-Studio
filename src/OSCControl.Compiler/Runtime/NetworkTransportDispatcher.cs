@@ -12,8 +12,11 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
     private readonly Dictionary<string, UdpClient> _udpClients = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ClientWebSocket> _webSockets = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, WebSocket>> _webSocketServerSockets = new(StringComparer.Ordinal);
+    private readonly DglabSocketSessionRegistry _dglabSocketSessions = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _disposed;
+
+    internal DglabSocketSessionRegistry DglabSocketSessions => _dglabSocketSessions;
 
     public async Task DispatchAsync(RuntimeResolvedEndpoint endpoint, RuntimeOutboundMessage message, CancellationToken cancellationToken)
     {
@@ -31,6 +34,10 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
 
             case "ws.server":
                 await DispatchWebSocketServerAsync(endpoint, message, cancellationToken);
+                return;
+
+            case "dglab.socket":
+                await DispatchDglabSocketAsync(endpoint, message, cancellationToken);
                 return;
 
             default:
@@ -73,6 +80,7 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
 
             _webSockets.Clear();
             _webSocketServerSockets.Clear();
+            await _dglabSocketSessions.DisposeAsync();
             _udpClients.Clear();
         }
         finally
@@ -125,6 +133,13 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
             {
             }
         }
+    }
+
+    private async Task DispatchDglabSocketAsync(RuntimeResolvedEndpoint endpoint, RuntimeOutboundMessage message, CancellationToken cancellationToken)
+    {
+        var command = DglabSocketMessage.CreateCommand(message);
+        var session = _dglabSocketSessions.GetOrCreate(endpoint);
+        await session.SendCommandAsync(command, cancellationToken);
     }
 
     private async Task<UdpClient> GetOrCreateUdpClientAsync(RuntimeResolvedEndpoint endpoint, CancellationToken cancellationToken)

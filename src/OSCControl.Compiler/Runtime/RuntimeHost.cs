@@ -101,6 +101,12 @@ public sealed class RuntimeHost : IAsyncDisposable
                 case "ws.server":
                     yield return new WebSocketServerInboundAdapter(endpoint, HandleInboundAsync, _errorSink, _networkTransportDispatcher);
                     break;
+                case "dglab.socket":
+                    if (_networkTransportDispatcher is not null)
+                    {
+                        yield return new DglabSocketInboundAdapter(endpoint, _networkTransportDispatcher.DglabSocketSessions, HandleInboundAsync, _errorSink);
+                    }
+                    break;
             }
         }
     }
@@ -510,5 +516,55 @@ internal sealed class WebSocketServerInboundAdapter : IRuntimeInboundAdapter
             _sockets.TryRemove(socketId, out _);
             socket.Dispose();
         }
+    }
+}
+
+internal sealed class DglabSocketInboundAdapter : IRuntimeInboundAdapter
+{
+    private readonly RuntimeResolvedEndpoint _endpoint;
+    private readonly DglabSocketSessionRegistry _sessions;
+    private readonly Func<string, RuntimeEventMessage, CancellationToken, Task> _onMessage;
+    private readonly IRuntimeHostErrorSink _errorSink;
+    private IDisposable? _subscription;
+    private DglabSocketSession? _session;
+
+    public DglabSocketInboundAdapter(
+        RuntimeResolvedEndpoint endpoint,
+        DglabSocketSessionRegistry sessions,
+        Func<string, RuntimeEventMessage, CancellationToken, Task> onMessage,
+        IRuntimeHostErrorSink errorSink)
+    {
+        _endpoint = endpoint;
+        _sessions = sessions;
+        _onMessage = onMessage;
+        _errorSink = errorSink;
+    }
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        if (_session is not null)
+        {
+            return;
+        }
+
+        _session = _sessions.GetOrCreate(_endpoint);
+        _subscription = _session.Subscribe((message, token) => _onMessage(_endpoint.Name, message, token));
+
+        try
+        {
+            await _session.StartAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _errorSink.Report(new RuntimeHostError(_endpoint.Name, _endpoint.TransportKind, "dglab", ex, DateTimeOffset.UtcNow));
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _subscription?.Dispose();
+        _subscription = null;
+        _session = null;
+        await _sessions.RemoveAsync(_endpoint.Name);
     }
 }
