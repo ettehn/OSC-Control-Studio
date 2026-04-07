@@ -71,6 +71,24 @@ For IDE usage, open:
 OSCControl.sln
 ```
 
+## DG-LAB Integration Notice / DG-LAB 集成声明
+
+This project may include experimental DG-LAB Socket or BLE integration for user-controlled automation scenarios. The integration is not an official DG-LAB product, is not affiliated with or endorsed by DG-LAB, and is based on the public DG-LAB open-source protocol materials:
+
+- [DG-LAB-OPENSOURCE](https://github.com/DG-LAB-OPENSOURCE/DG-LAB-OPENSOURCE)
+- [SOCKET control protocol v2](https://github.com/DG-LAB-OPENSOURCE/DG-LAB-OPENSOURCE/blob/main/socket/v2/README.md)
+- [Coyote V3 Bluetooth protocol](https://github.com/DG-LAB-OPENSOURCE/DG-LAB-OPENSOURCE/blob/main/coyote/v3/README_V3.md)
+
+DG-LAB's public materials state that unauthorized commercial use is not allowed. This project treats DG-LAB support as a non-commercial, open-source, user-operated integration. If you plan to use this integration in a commercial product, paid service, packaged distribution, or hosted platform, obtain authorization from DG-LAB first.
+
+Users must explicitly connect, pair, scan, or select their own devices before using DG-LAB-related automation. Do not use this project for silent remote control, coercive control, or operation without the device user's consent. Scripts should keep strength, pulse, clear, stop, and disconnect behavior visible and controllable by the user.
+
+本项目可能包含实验性的 DG-LAB Socket 或 BLE 集成，用于用户主动控制的自动化场景。该集成不是 DG-LAB 官方产品，也不代表 DG-LAB 官方授权或背书；相关实现参考 DG-LAB 公开的开源协议资料。
+
+DG-LAB 公开资料中说明未经授权不得用于商业用途。本项目将 DG-LAB 支持定位为非商业、开源、用户主动操作的集成能力。如果你计划将该能力用于商业产品、付费服务、打包分发或托管平台，请先取得 DG-LAB 授权。
+
+用户在使用 DG-LAB 相关自动化前，必须主动连接、配对、扫码或选择自己的设备。请勿将本项目用于静默远程控制、强迫控制或未经设备使用者同意的操作。脚本应让强度、波形、清空、停止和断开行为保持可见且可由用户控制。
+
 ## Risk and Disclaimer / 风险与免责声明
 
 This project is intended for automation workflows involving OSC, WebSocket, VRChat OSC, and related control scenarios. Users are responsible for verifying the safety of their scripts, network endpoints, devices, and third-party software configurations.
