@@ -182,7 +182,7 @@
 
   generator.forBlock.ws_send_text = function (block) {
     const target = identifier(block.getFieldValue('TARGET'), 'wsClient');
-    const text = stringLiteral(block.getFieldValue('TEXT') || 'hello');
+    const text = expressionOrString(block.getFieldValue('TEXT') || '"hello"');
     return `send ${target} {\n    body: ${text}\n}\n`;
   };
 
@@ -225,7 +225,7 @@
   };
 
   generator.forBlock.vrchat_chat = function (block) {
-    const text = expressionOrString(block.getFieldValue('TEXT') || 'Hello from OSCControl');
+    const text = expressionOrString(block.getFieldValue('TEXT') || '"Hello from OSCControl"');
     const send = block.getFieldValue('SEND') === 'TRUE' ? 'true' : 'false';
     const notify = block.getFieldValue('NOTIFY') === 'TRUE' ? 'true' : 'false';
     return `vrchat.chat ${text} send=${send} notify=${notify}\n`;
@@ -422,15 +422,7 @@
 
   function expressionOrString(value) {
     const trimmed = (value || '').trim();
-    if (!trimmed) {
-      return '""';
-    }
-
-    if (/^".*"$/.test(trimmed) || /^(true|false|null)$/i.test(trimmed) || /^-?\d+(\.\d+)?$/.test(trimmed) || /^[A-Za-z_][A-Za-z0-9_]*(\(.*\))?$/.test(trimmed) || /^[{\[(]/.test(trimmed) || /[=<>!+\-*/.:]/.test(trimmed)) {
-      return trimmed;
-    }
-
-    return stringLiteral(trimmed);
+    return trimmed || '""';
   }
 
   window.OSCControlBlocklyGenerator = generator;

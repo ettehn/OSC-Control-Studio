@@ -227,12 +227,12 @@
       "message0": "log text/expression %1 %2",
       "args0": [
         { "type": "field_dropdown", "name": "LEVEL", "options": [["info", "info"], ["warn", "warn"], ["error", "error"]] },
-        { "type": "field_input", "name": "VALUE", "text": "ready" }
+        { "type": "field_input", "name": "VALUE", "text": "\"ready\"" }
       ],
       "previousStatement": null,
       "nextStatement": null,
       "colour": 60,
-      "tooltip": "Write a runtime log entry. Type any declared variable name, for example count or score, to reference it; plain text is emitted as a string.",
+      "tooltip": "Write a runtime log entry. This field is raw DSL: type count to reference a variable, or \"ready\" for a string literal.",
       "helpUrl": ""
     },
     {
@@ -295,12 +295,12 @@
       "message0": "send WebSocket text to %1 text %2",
       "args0": [
         { "type": "field_input", "name": "TARGET", "text": "wsClient" },
-        { "type": "field_input", "name": "TEXT", "text": "hello" }
+        { "type": "field_input", "name": "TEXT", "text": "\"hello\"" }
       ],
       "previousStatement": null,
       "nextStatement": null,
       "colour": 30,
-      "tooltip": "Send a text WebSocket payload using the endpoint codec. Use codec text for raw text payloads.",
+      "tooltip": "Send a WebSocket body. This field is raw DSL: type count to reference a variable, or \"hello\" for a string literal. Use codec text for raw text payloads.",
       "helpUrl": ""
     },
     {
@@ -391,14 +391,14 @@
       "type": "vrchat_chat",
       "message0": "VRChat chatbox text/expression %1 send %2 notify %3",
       "args0": [
-        { "type": "field_input", "name": "TEXT", "text": "Hello from OSCControl" },
+        { "type": "field_input", "name": "TEXT", "text": "\"Hello from OSCControl\"" },
         { "type": "field_checkbox", "name": "SEND", "checked": true },
         { "type": "field_checkbox", "name": "NOTIFY", "checked": false }
       ],
       "previousStatement": null,
       "nextStatement": null,
       "colour": 30,
-      "tooltip": "Send text or an expression to the VRChat chatbox. Type any declared variable name, for example count or score, to reference it.",
+      "tooltip": "Send text or an expression to the VRChat chatbox. This field is raw DSL: type count to reference a variable, or \"hello\" for a string literal.",
       "helpUrl": ""
     },
     {

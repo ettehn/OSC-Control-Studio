@@ -6,7 +6,7 @@
           <statement name="STACK">
             <block type="osc_log">
               <field name="LEVEL">info</field>
-              <field name="VALUE">ready</field>
+              <field name="VALUE">&quot;ready&quot;</field>
             </block>
           </statement>
         </block>
@@ -51,7 +51,7 @@
             <block type="osc_startup_rule">
               <statement name="STACK">
                 <block type="vrchat_chat">
-                  <field name="TEXT">Hello from OSCControl</field>
+                  <field name="TEXT">&quot;Hello from OSCControl&quot;</field>
                   <field name="SEND">TRUE</field>
                   <field name="NOTIFY">FALSE</field>
                 </block>
@@ -178,7 +178,7 @@
                   <field name="VALUE">true</field>
                   <next>
                     <block type="vrchat_chat">
-                      <field name="TEXT">Avatar changed</field>
+                      <field name="TEXT">&quot;Avatar changed&quot;</field>
                       <field name="SEND">TRUE</field>
                       <field name="NOTIFY">FALSE</field>
                       <next>
