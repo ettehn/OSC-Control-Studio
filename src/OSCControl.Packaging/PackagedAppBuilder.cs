@@ -28,7 +28,7 @@ public sealed class PackagedAppBuilder
         var appName = string.IsNullOrWhiteSpace(request.AppName) ? "OSCControl App" : request.AppName.Trim();
         var appFolderName = SanitizeDirectoryName(appName);
         var hostSource = string.IsNullOrWhiteSpace(request.HostSource) ? null : Path.GetFullPath(request.HostSource);
-        var sourceScriptPath = string.IsNullOrWhiteSpace(request.ScriptPath) ? null : Path.GetFullPath(request.ScriptPath);
+        var sourceScriptLabel = CreateSourceScriptLabel(request.ScriptPath);
 
         if (hostSource is not null && !Directory.Exists(hostSource))
         {
@@ -48,6 +48,11 @@ public sealed class PackagedAppBuilder
         var hostFolder = Path.Combine(appRoot, "host");
         var assetsFolder = Path.Combine(appFolder, "assets");
 
+        if (hostSource is not null && PathsOverlap(hostSource, hostFolder))
+        {
+            throw new InvalidOperationException($"Host source must not overlap the generated host folder: {hostSource}");
+        }
+
         PreparePackageDirectory(appRoot, directoriesToClean: [appFolder, hostFolder], directoriesToCreate: [appFolder, dataFolder, logsFolder, hostFolder, assetsFolder]);
 
         var manifest = new PackagedAppManifest
@@ -57,7 +62,7 @@ public sealed class PackagedAppBuilder
             Plan = "app.plan.json",
             Data = "../data",
             Logs = "../logs",
-            SourceScript = sourceScriptPath
+            SourceScript = sourceScriptLabel
         };
 
         var scriptOutputPath = Path.Combine(appFolder, manifest.Script);
@@ -88,6 +93,17 @@ public sealed class PackagedAppBuilder
             RunCommandPath = runCommandPath,
             HostCopied = hostCopied
         };
+    }
+
+    private static string? CreateSourceScriptLabel(string? scriptPath)
+    {
+        if (string.IsNullOrWhiteSpace(scriptPath))
+        {
+            return null;
+        }
+
+        var label = Path.GetFileName(scriptPath.Trim());
+        return string.IsNullOrWhiteSpace(label) ? null : label;
     }
 
     private static void PreparePackageDirectory(string appRoot, IReadOnlyList<string> directoriesToClean, IReadOnlyList<string> directoriesToCreate)
@@ -190,10 +206,22 @@ public sealed class PackagedAppBuilder
         return sanitized;
     }
 
+    private static bool PathsOverlap(string left, string right) =>
+        IsPathInsideOrEqual(left, right) || IsPathInsideOrEqual(right, left);
+
     private static bool IsPathInside(string path, string root)
     {
         var fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
         var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
         return fullPath.StartsWith(fullRoot, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsPathInsideOrEqual(string path, string root)
+    {
+        var fullPath = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var fullRoot = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return fullPath.Equals(fullRoot, StringComparison.OrdinalIgnoreCase)
+            || fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || fullPath.StartsWith(fullRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 }

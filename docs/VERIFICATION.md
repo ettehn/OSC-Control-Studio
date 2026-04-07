@@ -6,6 +6,14 @@ This repository is often built in constrained Windows environments where the def
 .\Verify.ps1
 ```
 
+The repository also includes a solution entry point for IDE loading or manual project-wide builds:
+
+```powershell
+dotnet build C:\CodexProjects\OSCControl.sln -m:1 -nr:false -v:minimal
+```
+
+Prefer `Verify.ps1` for routine validation because it also runs the in-repo test harness.
+
 For build-only verification:
 
 ```powershell

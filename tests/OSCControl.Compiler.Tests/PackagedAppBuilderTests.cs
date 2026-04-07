@@ -39,7 +39,7 @@ on startup [
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase
             });
             Assert.NotNull(manifest);
-            Assert.Equal("source.osccontrol", Path.GetFileName(manifest.SourceScript));
+            Assert.Equal("source.osccontrol", manifest.SourceScript);
 
             var plan = RuntimePlanJsonCodec.Deserialize(await File.ReadAllTextAsync(first.PlanPath));
             Assert.Single(plan.Rules);
@@ -61,6 +61,47 @@ on startup [
             Assert.False(File.Exists(Path.Combine(second.AppFolder, "stale.txt")));
             Assert.False(File.Exists(Path.Combine(second.AppRoot, "host", "stale.txt")));
             Assert.True(File.Exists(Path.Combine(second.AppRoot, "data", "keep.txt")));
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, recursive: true);
+            }
+        }
+    }
+
+
+    [Fact]
+    public async Task BuildAsync_RejectsHostSourceInsideTargetHostFolder()
+    {
+        var root = CreateTempDirectory();
+        try
+        {
+            var targetHost = Path.Combine(root, "App", "host");
+            Directory.CreateDirectory(targetHost);
+
+            var failed = false;
+            try
+            {
+                await new PackagedAppBuilder().BuildAsync(new PackageBuildRequest
+                {
+                    Source = """
+on startup [
+    log info "packaged"
+]
+""",
+                    OutputRoot = root,
+                    AppName = "App",
+                    HostSource = targetHost
+                });
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("Host source", StringComparison.OrdinalIgnoreCase))
+            {
+                failed = true;
+            }
+
+            Assert.True(failed, "Expected overlapping HostSource to be rejected.");
         }
         finally
         {

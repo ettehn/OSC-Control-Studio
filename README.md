@@ -1,14 +1,27 @@
-﻿# OSCControl
+# OSCControl
 
-OSCControl 鏄竴涓潰鍚?Windows 鐨?OSC / WebSocket / VRChat OSC 鑷姩鍖栧伐鍏烽摼锛屽寘鍚闈㈠涓汇€佽剼鏈瑷€銆丅locks 鍙鍖栫敓鎴愬櫒銆佽繍琛屾椂瀹夸富鍜屾墦鍖呭櫒銆?
-## 鐢ㄦ埛璇存槑
+OSCControl 是一个面向 Windows 的 OSC / WebSocket / VRChat OSC 自动化工具链，包含脚本语言、编译器、运行时、桌面宿主、Blocks 可视化编辑器和应用打包器。
 
-- [涓枃鐢ㄦ埛璇存槑](docs/USER-GUIDE.zh-CN.md)
+## 用户入口
 
-## 寮€鍙戞枃妗?
-- [璇█瑙勮寖](OSCControl-language-spec.md)
-- [瑙ｆ瀽鍣ㄨ璁(OSCControl-parser-design.md)
-- [VRChat OSC 璇硶绯栬褰昡(VRChat-OSC-sugar.md)
-- [楠岃瘉鍛戒护](docs/VERIFICATION.md)
+- [中文用户说明](docs/USER-GUIDE.zh-CN.md)
+- [桌面端启动脚本](OSCControl-DesktopHost.cmd)
+
+## 开发文档
+
+- [语言规范](OSCControl-language-spec.md)
+- [解析器设计](OSCControl-parser-design.md)
+- [VRChat OSC 语法糖](VRChat-OSC-sugar.md)
+- [验证说明](docs/VERIFICATION.md)
 - [NuGet restore 问题记录](docs/NUGET-RESTORE-ISSUE.md)
 
+## 构建入口
+
+- [解决方案](OSCControl.sln)
+- [验证脚本](Verify.ps1)
+
+常规验证命令：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\CodexProjects\Verify.ps1
+```

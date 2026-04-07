@@ -79,9 +79,9 @@ internal static class Program
             await host.StopAsync();
             return 0;
         }
-        catch (InvalidOperationException ex)
+        catch (Exception ex) when (ex is InvalidOperationException or JsonException or IOException or UnauthorizedAccessException)
         {
-            Console.Error.WriteLine(ex.Message);
+            Console.Error.WriteLine($"Could not start packaged app: {ex.Message}");
             return 2;
         }
     }
@@ -91,7 +91,13 @@ internal static class Program
         if (args.Length > 0)
         {
             var explicitRoot = Path.GetFullPath(args[0]);
-            return File.Exists(Path.Combine(explicitRoot, "app.manifest.json")) ? explicitRoot : null;
+            if (File.Exists(Path.Combine(explicitRoot, "app.manifest.json")))
+            {
+                return explicitRoot;
+            }
+
+            var explicitAppRoot = Path.Combine(explicitRoot, "app");
+            return File.Exists(Path.Combine(explicitAppRoot, "app.manifest.json")) ? explicitAppRoot : null;
         }
 
         var baseDirectory = AppContext.BaseDirectory;
@@ -126,7 +132,7 @@ internal static class Program
                     Console.WriteLine($"Loaded runtime plan: {planPath}");
                     return plan;
                 }
-                catch (Exception ex) when (ex is JsonException or InvalidOperationException or NotSupportedException)
+                catch (Exception ex) when (ex is JsonException or InvalidOperationException or NotSupportedException or IOException or UnauthorizedAccessException)
                 {
                     Console.Error.WriteLine($"Could not load runtime plan '{planPath}': {ex.Message}");
                     Console.Error.WriteLine("Falling back to app.osccontrol compilation.");
