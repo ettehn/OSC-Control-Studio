@@ -1,5 +1,6 @@
 using System.Text.Json;
 using OSCControl.Compiler.Compiler;
+using OSCControl.Compiler.Runtime;
 
 namespace OSCControl.Packager;
 
@@ -69,14 +70,7 @@ internal static class Program
         await File.WriteAllTextAsync(Path.Combine(appFolder, manifest.Script), source);
         await File.WriteAllTextAsync(Path.Combine(appFolder, "app.manifest.json"), JsonSerializer.Serialize(manifest, JsonOptions));
 
-        var planPreview = new
-        {
-            note = "RuntimePlan JSON serialization is not yet authoritative. AppHost recompiles app.osccontrol at startup for now.",
-            endpoints = result.Plan.Endpoints.Count,
-            states = result.Plan.States.Count,
-            rules = result.Plan.Rules.Count
-        };
-        await File.WriteAllTextAsync(Path.Combine(appFolder, "app.plan.json"), JsonSerializer.Serialize(planPreview, JsonOptions));
+        await File.WriteAllTextAsync(Path.Combine(appFolder, "app.plan.json"), RuntimePlanJsonCodec.Serialize(result.Plan));
 
         if (hostSource is not null)
         {

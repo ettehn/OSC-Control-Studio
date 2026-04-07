@@ -33,19 +33,13 @@ internal static class Program
 
         Directory.CreateDirectory(Path.GetFullPath(Path.Combine(appRoot, manifest.Logs)));
 
-        var source = await File.ReadAllTextAsync(scriptPath);
-        var result = new CompilerPipeline().Compile(source);
-        if (result.HasErrors || result.Plan is null)
+        var plan = await LoadPlanAsync(appRoot, manifest, scriptPath);
+        if (plan is null)
         {
-            foreach (var diagnostic in result.Diagnostics)
-            {
-                Console.Error.WriteLine($"{diagnostic.Severity} {diagnostic.Span.Start.Line}:{diagnostic.Span.Start.Column}: {diagnostic.Message}");
-            }
-
             return 1;
         }
 
-        await using var engine = new RuntimeEngine(result.Plan, new RuntimeEngineOptions
+        await using var engine = new RuntimeEngine(plan, new RuntimeEngineOptions
         {
             LogSink = new ConsoleRuntimeLogSink()
         });
@@ -78,5 +72,42 @@ internal static class Program
 
         await host.StopAsync();
         return 0;
+    }
+
+    private static async Task<RuntimePlan?> LoadPlanAsync(string appRoot, AppManifest manifest, string scriptPath)
+    {
+        if (!string.IsNullOrWhiteSpace(manifest.Plan))
+        {
+            var planPath = Path.Combine(appRoot, manifest.Plan);
+            if (File.Exists(planPath))
+            {
+                try
+                {
+                    var plan = RuntimePlanJsonCodec.Deserialize(await File.ReadAllTextAsync(planPath));
+                    Console.WriteLine($"Loaded runtime plan: {planPath}");
+                    return plan;
+                }
+                catch (Exception ex) when (ex is JsonException or InvalidOperationException or NotSupportedException)
+                {
+                    Console.Error.WriteLine($"Could not load runtime plan '{planPath}': {ex.Message}");
+                    Console.Error.WriteLine("Falling back to app.osccontrol compilation.");
+                }
+            }
+        }
+
+        var source = await File.ReadAllTextAsync(scriptPath);
+        var result = new CompilerPipeline().Compile(source);
+        if (!result.HasErrors && result.Plan is not null)
+        {
+            Console.WriteLine($"Compiled runtime plan from script: {scriptPath}");
+            return result.Plan;
+        }
+
+        foreach (var diagnostic in result.Diagnostics)
+        {
+            Console.Error.WriteLine($"{diagnostic.Severity} {diagnostic.Span.Start.Line}:{diagnostic.Span.Start.Column}: {diagnostic.Message}");
+        }
+
+        return null;
     }
 }
