@@ -12,6 +12,7 @@ OSCControl 是一个面向 Windows 的 OSC / WebSocket / VRChat OSC 自动化工
 - [语言规范](OSCControl-language-spec.md)
 - [解析器设计](OSCControl-parser-design.md)
 - [VRChat OSC 语法糖](VRChat-OSC-sugar.md)
+- [Blockly 集成方案](docs/BLOCKLY-INTEGRATION.md)
 - [验证说明](docs/VERIFICATION.md)
 - [NuGet restore 问题记录](docs/NUGET-RESTORE-ISSUE.md)
 
