@@ -141,6 +141,30 @@
           </next>
         </block>
       </xml>`,
+    'ws-duplex': `
+      <xml xmlns="https://developers.google.com/blockly/xml">
+        <block type="ws_server_endpoint" x="32" y="32">
+          <field name="NAME">wsServer</field>
+          <field name="MODE">duplex</field>
+          <field name="HOST">127.0.0.1</field>
+          <field name="PORT">8081</field>
+          <field name="PATH">/control</field>
+          <field name="CODEC">json</field>
+          <next>
+            <block type="ws_receive_rule">
+              <field name="ENDPOINT">wsServer</field>
+              <field name="ADDRESS">/ping</field>
+              <statement name="STACK">
+                <block type="ws_send_json">
+                  <field name="TARGET">wsServer</field>
+                  <field name="ADDRESS">/pong</field>
+                  <field name="BODY">{value: body(&quot;value&quot;)}</field>
+                </block>
+              </statement>
+            </block>
+          </next>
+        </block>
+      </xml>`,
     'vrchat-avatar-typing': `
       <xml xmlns="https://developers.google.com/blockly/xml">
         <block type="vrchat_endpoint" x="32" y="32">

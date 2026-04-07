@@ -70,6 +70,13 @@
     const codec = barewordOrString(block.getFieldValue('CODEC') || 'json');
     return `endpoint ${name}: ${transport} {\n    mode: ${mode}\n    host: ${host}\n    port: ${port}\n    path: ${path}\n    codec: ${codec}\n}\n\n`;
   };
+  generator.forBlock.ws_client_endpoint = function (block) {
+    return websocketEndpoint(block, 'ws.client', 'wsClient');
+  };
+
+  generator.forBlock.ws_server_endpoint = function (block) {
+    return websocketEndpoint(block, 'ws.server', 'wsServer');
+  };
 
   generator.forBlock.vrchat_endpoint = function (block) {
     const host = stringLiteral(block.getFieldValue('HOST') || '127.0.0.1');
@@ -107,6 +114,20 @@
     const address = stringLiteral(block.getFieldValue('ADDRESS') || '/example');
     const condition = expression(block.getFieldValue('CONDITION'), 'true');
     const body = generator.statementToCode(block, 'STACK') || '    log info "got message"\n';
+    return `on receive ${endpoint} when msg.address == ${address} and ${condition} [\n${body}]\n\n`;
+  };
+  generator.forBlock.ws_receive_rule = function (block) {
+    const endpoint = identifier(block.getFieldValue('ENDPOINT'), 'wsServer');
+    const address = stringLiteral(block.getFieldValue('ADDRESS') || '/ping');
+    const body = generator.statementToCode(block, 'STACK') || '    log info body\n';
+    return `on receive ${endpoint} when msg.address == ${address} [\n${body}]\n\n`;
+  };
+
+  generator.forBlock.ws_receive_rule_when = function (block) {
+    const endpoint = identifier(block.getFieldValue('ENDPOINT'), 'wsServer');
+    const address = stringLiteral(block.getFieldValue('ADDRESS') || '/ping');
+    const condition = expression(block.getFieldValue('CONDITION'), 'true');
+    const body = generator.statementToCode(block, 'STACK') || '    log info body\n';
     return `on receive ${endpoint} when msg.address == ${address} and ${condition} [\n${body}]\n\n`;
   };
 
@@ -150,6 +171,25 @@
     const target = identifier(block.getFieldValue('TARGET'), 'wsOut');
     const address = stringLiteral(block.getFieldValue('ADDRESS') || '/hello');
     const body = expressionOrString(block.getFieldValue('BODY'));
+    return `send ${target} {\n    address: ${address}\n    body: ${body}\n}\n`;
+  };
+  generator.forBlock.ws_send_json = function (block) {
+    const target = identifier(block.getFieldValue('TARGET'), 'wsServer');
+    const address = stringLiteral(block.getFieldValue('ADDRESS') || '/pong');
+    const body = expressionOrString(block.getFieldValue('BODY'));
+    return `send ${target} {\n    address: ${address}\n    body: ${body}\n}\n`;
+  };
+
+  generator.forBlock.ws_send_text = function (block) {
+    const target = identifier(block.getFieldValue('TARGET'), 'wsClient');
+    const text = stringLiteral(block.getFieldValue('TEXT') || 'hello');
+    return `send ${target} {\n    body: ${text}\n}\n`;
+  };
+
+  generator.forBlock.ws_send_json_expr = function (block) {
+    const target = identifier(block.getFieldValue('TARGET'), 'wsServer');
+    const address = stringLiteral(block.getFieldValue('ADDRESS') || '/pong');
+    const body = generator.valueToCode(block, 'BODY', generator.ORDER_NONE) || 'null';
     return `send ${target} {\n    address: ${address}\n    body: ${body}\n}\n`;
   };
 
@@ -331,6 +371,23 @@
     return VRCHAT_READONLY_AVATAR_PARAMETERS.has(String(value || '').toLowerCase());
   }
 
+  function websocketEndpoint(block, transport, fallbackName) {
+    const name = identifier(block.getFieldValue('NAME'), fallbackName);
+    const mode = endpointMode(block.getFieldValue('MODE'));
+    const host = stringLiteral(block.getFieldValue('HOST') || '127.0.0.1');
+    const port = portNumber(block.getFieldValue('PORT'), transport === 'ws.server' ? 8081 : 8080);
+    const path = stringLiteral(block.getFieldValue('PATH') || '/control');
+    const codec = barewordOrString(block.getFieldValue('CODEC') || 'json');
+    return `endpoint ${name}: ${transport} {
+    mode: ${mode}
+    host: ${host}
+    port: ${port}
+    path: ${path}
+    codec: ${codec}
+}
+
+`;
+  }
   function endpointMode(value) {
     return value === 'output' || value === 'duplex' ? value : 'input';
   }

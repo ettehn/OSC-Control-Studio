@@ -21,6 +21,7 @@
         <option value="vrchat-param-input">VRChat param to input</option>
         <option value="stateful-loop">Stateful loop</option>
         <option value="ws-forward">OSC to WebSocket body</option>
+        <option value="ws-duplex">WebSocket duplex echo</option>
         <option value="vrchat-avatar-typing">VRChat avatar typing</option>
       </select>
     </label>
@@ -41,6 +42,8 @@
     <category name="Endpoints" colour="#4f46e5">
       <block type="osc_endpoint_udp"></block>
       <block type="osc_endpoint_ws"></block>
+      <block type="ws_client_endpoint"></block>
+      <block type="ws_server_endpoint"></block>
       <block type="vrchat_endpoint"></block>
     </category>
     <category name="Variables" colour="#9333ea">
@@ -83,6 +86,8 @@
       <block type="osc_startup_rule"></block>
       <block type="osc_receive_rule"></block>
       <block type="osc_receive_rule_when"></block>
+      <block type="ws_receive_rule"></block>
+      <block type="ws_receive_rule_when"></block>
       <block type="vrchat_avatar_rule"></block>
       <block type="vrchat_builtin_param_rule"></block>
       <block type="vrchat_param_rule"></block>
@@ -94,6 +99,11 @@
       <block type="osc_log"></block>
       <block type="osc_send_simple"></block>
       <block type="osc_send_body"></block>
+      <block type="ws_send_json"></block>
+      <block type="ws_send_text"></block>
+      <block type="ws_send_json_expr">
+        <value name="BODY"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
+      </block>
     </category>
     <category name="Control" colour="#16a34a">
       <block type="osc_if"></block>

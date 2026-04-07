@@ -36,6 +36,38 @@
       "helpUrl": ""
     },
     {
+      "type": "ws_client_endpoint",
+      "message0": "WebSocket client %1 mode %2 connect %3 port %4 path %5 codec %6",
+      "args0": [
+        { "type": "field_input", "name": "NAME", "text": "wsClient" },
+        { "type": "field_dropdown", "name": "MODE", "options": [["duplex", "duplex"], ["input", "input"], ["output", "output"]] },
+        { "type": "field_input", "name": "HOST", "text": "127.0.0.1" },
+        { "type": "field_number", "name": "PORT", "value": 8080, "min": 1, "max": 65535, "precision": 1 },
+        { "type": "field_input", "name": "PATH", "text": "/control" },
+        { "type": "field_dropdown", "name": "CODEC", "options": [["json", "json"], ["text", "text"], ["bytes", "bytes"]] }
+      ],
+      "nextStatement": null,
+      "colour": 230,
+      "tooltip": "Declare a WebSocket client endpoint. Duplex mode receives from and sends to the remote server on the same connection.",
+      "helpUrl": ""
+    },
+    {
+      "type": "ws_server_endpoint",
+      "message0": "WebSocket server %1 mode %2 listen %3 port %4 path %5 codec %6",
+      "args0": [
+        { "type": "field_input", "name": "NAME", "text": "wsServer" },
+        { "type": "field_dropdown", "name": "MODE", "options": [["duplex", "duplex"], ["input", "input"], ["output", "output"]] },
+        { "type": "field_input", "name": "HOST", "text": "127.0.0.1" },
+        { "type": "field_number", "name": "PORT", "value": 8081, "min": 1, "max": 65535, "precision": 1 },
+        { "type": "field_input", "name": "PATH", "text": "/control" },
+        { "type": "field_dropdown", "name": "CODEC", "options": [["json", "json"], ["text", "text"], ["bytes", "bytes"]] }
+      ],
+      "nextStatement": null,
+      "colour": 230,
+      "tooltip": "Declare a WebSocket server endpoint. Duplex mode receives client messages and broadcasts sends to connected clients.",
+      "helpUrl": ""
+    },
+    {
       "type": "vrchat_endpoint",
       "message0": "VRChat endpoint host %1 input %2 output %3",
       "args0": [
@@ -116,6 +148,37 @@
       "nextStatement": null,
       "colour": 190,
       "tooltip": "Run steps when an endpoint receives a matching address and condition.",
+      "helpUrl": ""
+    },
+    {
+      "type": "ws_receive_rule",
+      "message0": "when WebSocket %1 receives address %2 %3 %4",
+      "args0": [
+        { "type": "field_input", "name": "ENDPOINT", "text": "wsServer" },
+        { "type": "field_input", "name": "ADDRESS", "text": "/ping" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "STACK" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 190,
+      "tooltip": "Run steps when a WebSocket endpoint receives a JSON envelope with the matching address.",
+      "helpUrl": ""
+    },
+    {
+      "type": "ws_receive_rule_when",
+      "message0": "when WebSocket %1 receives address %2 and %3 %4 %5",
+      "args0": [
+        { "type": "field_input", "name": "ENDPOINT", "text": "wsServer" },
+        { "type": "field_input", "name": "ADDRESS", "text": "/ping" },
+        { "type": "field_input", "name": "CONDITION", "text": "body(\"value\") > 0" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "STACK" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 190,
+      "tooltip": "Run steps when a WebSocket endpoint receives a matching address and condition.",
       "helpUrl": ""
     },
     {
@@ -211,6 +274,47 @@
       "nextStatement": null,
       "colour": 30,
       "tooltip": "Send a message body to an endpoint.",
+      "helpUrl": ""
+    },
+    {
+      "type": "ws_send_json",
+      "message0": "send WebSocket JSON to %1 address %2 body %3",
+      "args0": [
+        { "type": "field_input", "name": "TARGET", "text": "wsServer" },
+        { "type": "field_input", "name": "ADDRESS", "text": "/pong" },
+        { "type": "field_input", "name": "BODY", "text": "{value: arg(0)}" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 30,
+      "tooltip": "Send a JSON WebSocket envelope. With ws.server, this broadcasts to connected clients; with ws.client, it sends to the remote server.",
+      "helpUrl": ""
+    },
+    {
+      "type": "ws_send_text",
+      "message0": "send WebSocket text to %1 text %2",
+      "args0": [
+        { "type": "field_input", "name": "TARGET", "text": "wsClient" },
+        { "type": "field_input", "name": "TEXT", "text": "hello" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 30,
+      "tooltip": "Send a text WebSocket payload using the endpoint codec. Use codec text for raw text payloads.",
+      "helpUrl": ""
+    },
+    {
+      "type": "ws_send_json_expr",
+      "message0": "send WebSocket JSON to %1 address %2 body %3",
+      "args0": [
+        { "type": "field_input", "name": "TARGET", "text": "wsServer" },
+        { "type": "field_input", "name": "ADDRESS", "text": "/pong" },
+        { "type": "input_value", "name": "BODY" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 30,
+      "tooltip": "Send a JSON WebSocket envelope with an expression body.",
       "helpUrl": ""
     },
     {
