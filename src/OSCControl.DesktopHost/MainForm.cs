@@ -136,10 +136,16 @@ internal sealed class MainForm : Form
         };
         topPanel.Controls.Add(runPanel, 7, 0);
 
-        _startButton = CreateButton(L("Start", "Start"), async (_, _) => await StartAsync());
+        _startButton = CreateButton(L("Start Host", "Start Host"), async (_, _) => await StartAsync());
+        _startButton.MinimumSize = new Size(96, 0);
         runPanel.Controls.Add(_startButton);
 
-        _stopButton = CreateButton(L("Stop", "Stop"), async (_, _) => await StopAsync());
+        _stopButton = CreateButton(L("Stop Host", "Stop Host"), async (_, _) => await StopAsync());
+        _stopButton.MinimumSize = new Size(96, 0);
+        _stopButton.BackColor = Color.FromArgb(220, 38, 38);
+        _stopButton.ForeColor = Color.White;
+        _stopButton.FlatStyle = FlatStyle.Flat;
+        _stopButton.UseVisualStyleBackColor = false;
         _stopButton.Enabled = false;
         runPanel.Controls.Add(_stopButton);
 
@@ -301,7 +307,7 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Top,
             AutoSize = true,
             MaximumSize = new Size(1280, 0),
-            Text = L("Blockly WebView2 editor is experimental. Generate script in Blockly, click Send To Host, then use Check/Save/Start from the desktop host.", "Blockly WebView2 editor is experimental. Generate script in Blockly, click Send To Host, then use Check/Save/Start from the desktop host."),
+            Text = L("Blockly WebView2 editor is experimental. Generate script in Blockly, click Send To Host, then use Check/Save/Start Host/Stop Host from the desktop host.", "Blockly WebView2 editor is experimental. Generate script in Blockly, click Send To Host, then use Check/Save/Start Host/Stop Host from the desktop host."),
             ForeColor = Color.FromArgb(55, 55, 55),
             Margin = new Padding(0, 0, 0, 8),
         };
@@ -315,7 +321,7 @@ internal sealed class MainForm : Form
             _editorTextBox.Text = _blocklyGeneratedSource;
             RenderDiagnostics(_controller.Compile(_blocklyGeneratedSource));
             var reason = string.IsNullOrWhiteSpace(script.Reason) ? "sync" : script.Reason.Trim();
-            UpdateStatus($"Blockly {reason}: {_blocklyGeneratedSource.Length} chars generated. Check/Save/Start now uses this script while Blocks is selected.");
+            UpdateStatus($"Blockly {reason}: {_blocklyGeneratedSource.Length} chars generated. Check/Save/Start Host now uses this script while Blocks is selected.");
         };
         root.Controls.Add(host, 0, 1);
 
@@ -2033,7 +2039,7 @@ internal sealed class MainForm : Form
         _checkButton.Enabled = enabled;
         _packageButton.Enabled = enabled;
         _startButton.Enabled = enabled && !_controller.IsRunning;
-        _stopButton.Enabled = enabled && _controller.IsRunning;
+        _stopButton.Enabled = _controller.IsRunning;
     }
 
     private void ResetBottomSplit()
