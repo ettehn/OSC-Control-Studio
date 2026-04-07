@@ -19,6 +19,9 @@
         <option value="osc-forward">OSC receive to OSC send</option>
         <option value="vrchat-chatbox">VRChat startup chatbox</option>
         <option value="vrchat-param-input">VRChat param to input</option>
+        <option value="stateful-loop">Stateful loop</option>
+        <option value="ws-forward">OSC to WebSocket body</option>
+        <option value="vrchat-avatar-typing">VRChat avatar typing</option>
       </select>
     </label>
     <button id="loadTemplateButton" type="button">Load Scenario</button>
@@ -37,19 +40,40 @@
   <xml id="toolbox" style="display:none">
     <category name="Endpoints" colour="#4f46e5">
       <block type="osc_endpoint_udp"></block>
+      <block type="osc_endpoint_ws"></block>
       <block type="vrchat_endpoint"></block>
+    </category>
+    <category name="Variables" colour="#9333ea">
+      <block type="osc_variable"></block>
+      <block type="osc_store"></block>
     </category>
     <category name="Rules" colour="#0891b2">
       <block type="osc_startup_rule"></block>
       <block type="osc_receive_rule"></block>
+      <block type="osc_receive_rule_when"></block>
+      <block type="vrchat_avatar_rule"></block>
       <block type="vrchat_param_rule"></block>
     </category>
     <category name="Actions" colour="#d97706">
       <block type="osc_log"></block>
       <block type="osc_send_simple"></block>
+      <block type="osc_send_body"></block>
+    </category>
+    <category name="Control" colour="#16a34a">
+      <block type="osc_if"></block>
+      <block type="osc_if_else"></block>
+      <block type="osc_while"></block>
+      <block type="osc_stop"></block>
+      <block type="osc_break"></block>
+      <block type="osc_continue"></block>
+    </category>
+    <category name="VRChat" colour="#db2777">
       <block type="vrchat_chat"></block>
       <block type="vrchat_input"></block>
       <block type="vrchat_param"></block>
+      <block type="vrchat_typing"></block>
+    </category>
+    <category name="Raw" colour="#6b7280">
       <block type="osc_raw_step"></block>
     </category>
   </xml>

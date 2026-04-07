@@ -78,6 +78,97 @@
             </block>
           </next>
         </block>
+      </xml>`,
+    'stateful-loop': `
+      <xml xmlns="https://developers.google.com/blockly/xml">
+        <block type="osc_variable" x="32" y="32">
+          <field name="NAME">count</field>
+          <field name="VALUE">0</field>
+          <next>
+            <block type="osc_startup_rule">
+              <statement name="STACK">
+                <block type="osc_while">
+                  <field name="CONDITION">count &lt; 3</field>
+                  <statement name="DO">
+                    <block type="osc_log">
+                      <field name="LEVEL">info</field>
+                      <field name="VALUE">count</field>
+                      <next>
+                        <block type="osc_store">
+                          <field name="NAME">count</field>
+                          <field name="VALUE">count + 1</field>
+                        </block>
+                      </next>
+                    </block>
+                  </statement>
+                </block>
+              </statement>
+            </block>
+          </next>
+        </block>
+      </xml>`,
+    'ws-forward': `
+      <xml xmlns="https://developers.google.com/blockly/xml">
+        <block type="osc_endpoint_udp" x="32" y="32">
+          <field name="NAME">oscIn</field>
+          <field name="MODE">input</field>
+          <field name="HOST">127.0.0.1</field>
+          <field name="PORT">9000</field>
+          <next>
+            <block type="osc_endpoint_ws">
+              <field name="TRANSPORT">ws.client</field>
+              <field name="NAME">wsOut</field>
+              <field name="MODE">output</field>
+              <field name="HOST">127.0.0.1</field>
+              <field name="PORT">8080</field>
+              <field name="PATH">/osc</field>
+              <field name="CODEC">json</field>
+              <next>
+                <block type="osc_receive_rule_when">
+                  <field name="ENDPOINT">oscIn</field>
+                  <field name="ADDRESS">/note/on</field>
+                  <field name="CONDITION">arg(0) &gt; 0</field>
+                  <statement name="STACK">
+                    <block type="osc_send_body">
+                      <field name="TARGET">wsOut</field>
+                      <field name="ADDRESS">/note/on</field>
+                      <field name="BODY">{value: arg(0)}</field>
+                    </block>
+                  </statement>
+                </block>
+              </next>
+            </block>
+          </next>
+        </block>
+      </xml>`,
+    'vrchat-avatar-typing': `
+      <xml xmlns="https://developers.google.com/blockly/xml">
+        <block type="vrchat_endpoint" x="32" y="32">
+          <field name="HOST">127.0.0.1</field>
+          <field name="INPUT_PORT">9000</field>
+          <field name="OUTPUT_PORT">9001</field>
+          <next>
+            <block type="vrchat_avatar_rule">
+              <statement name="STACK">
+                <block type="vrchat_typing">
+                  <field name="VALUE">true</field>
+                  <next>
+                    <block type="vrchat_chat">
+                      <field name="TEXT">Avatar changed</field>
+                      <field name="SEND">TRUE</field>
+                      <field name="NOTIFY">FALSE</field>
+                      <next>
+                        <block type="vrchat_typing">
+                          <field name="VALUE">false</field>
+                        </block>
+                      </next>
+                    </block>
+                  </next>
+                </block>
+              </statement>
+            </block>
+          </next>
+        </block>
       </xml>`
   };
 
