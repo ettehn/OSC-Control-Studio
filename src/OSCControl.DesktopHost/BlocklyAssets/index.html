@@ -3,54 +3,55 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>OSCControl Blockly Prototype</title>
+  <title>OSCControl Blockly Editor</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="toolbar">
-    <div>
-      <strong>OSCControl Blockly Prototype</strong>
+    <div class="title-block">
+      <strong>OSCControl Blockly Editor</strong>
       <span id="status">Loading Blockly...</span>
     </div>
-    <button id="postButton" type="button">Send To Host</button>
+    <label class="template-picker">
+      Scenario
+      <select id="templateSelect">
+        <option value="startup-log">Startup log</option>
+        <option value="osc-forward">OSC receive to OSC send</option>
+        <option value="vrchat-chatbox">VRChat startup chatbox</option>
+        <option value="vrchat-param-input">VRChat param to input</option>
+      </select>
+    </label>
+    <button id="loadTemplateButton" type="button">Load Scenario</button>
+    <button id="postButton" type="button">Apply To Desktop</button>
   </header>
 
   <main class="layout">
     <section id="blocklyDiv" aria-label="Blockly workspace"></section>
     <aside class="preview">
       <h2>Generated .osccontrol</h2>
+      <p id="hostHint">Changes auto-sync to the desktop host when WebView2 is attached. Use Check, Save, or Start in the desktop toolbar.</p>
       <pre id="scriptPreview"></pre>
     </aside>
   </main>
 
   <xml id="toolbox" style="display:none">
-    <category name="OSCControl" colour="#4f46e5">
+    <category name="Endpoints" colour="#4f46e5">
       <block type="osc_endpoint_udp"></block>
+      <block type="vrchat_endpoint"></block>
+    </category>
+    <category name="Rules" colour="#0891b2">
       <block type="osc_startup_rule"></block>
       <block type="osc_receive_rule"></block>
+      <block type="vrchat_param_rule"></block>
+    </category>
+    <category name="Actions" colour="#d97706">
       <block type="osc_log"></block>
       <block type="osc_send_simple"></block>
+      <block type="vrchat_chat"></block>
+      <block type="vrchat_input"></block>
+      <block type="vrchat_param"></block>
       <block type="osc_raw_step"></block>
     </category>
-  </xml>
-
-  <xml id="startBlocks" style="display:none">
-    <block type="osc_endpoint_udp" x="32" y="32">
-      <field name="NAME">oscIn</field>
-      <field name="MODE">input</field>
-      <field name="HOST">127.0.0.1</field>
-      <field name="PORT">9000</field>
-      <next>
-        <block type="osc_startup_rule">
-          <statement name="STACK">
-            <block type="osc_log">
-              <field name="LEVEL">info</field>
-              <field name="VALUE">ready</field>
-            </block>
-          </statement>
-        </block>
-      </next>
-    </block>
   </xml>
 
   <!-- Vendor Blockly files are intentionally not committed yet. Place the bundled Blockly files under vendor/blockly/. -->

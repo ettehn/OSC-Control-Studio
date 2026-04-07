@@ -99,6 +99,17 @@ Stop or re-scope the Blockly integration if any of these become true:
 - WebView2 distribution becomes a larger problem than the editor value.
 - workspace JSON becomes mandatory before script generation is reliable.
 
+## Implemented Blockly Scenarios
+
+The current Blockly page is no longer only a blank prototype. It includes these first practical scenarios:
+
+- `Startup log`: generate a minimal `on startup` rule with a log step.
+- `OSC receive to OSC send`: declare `oscIn` and `oscOut`, then forward a received argument to an output OSC message.
+- `VRChat startup chatbox`: declare `vrchat.endpoint`, then send a Chatbox message on startup.
+- `VRChat param to input`: declare `vrchat.endpoint`, then map a VRChat avatar parameter event to a VRChat input.
+
+When the WebView2 host is enabled, Blockly changes debounce and auto-sync generated `.osccontrol` text back to the desktop host. While the `Blocks` tab is selected, desktop `Check`, `Save`, `Package App...`, and `Start` use the latest generated Blockly script.
+
 ## WebView2 Build Switch
 
 The WebView2 host path is optional so the default repository build does not require a new NuGet restore.

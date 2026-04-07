@@ -314,7 +314,8 @@ internal sealed class MainForm : Form
             _blocklyWorkspaceJson = script.WorkspaceJson;
             _editorTextBox.Text = _blocklyGeneratedSource;
             RenderDiagnostics(_controller.Compile(_blocklyGeneratedSource));
-            UpdateStatus(L("Received Blockly generated script.", "Received Blockly generated script."));
+            var reason = string.IsNullOrWhiteSpace(script.Reason) ? "sync" : script.Reason.Trim();
+            UpdateStatus($"Blockly {reason}: {_blocklyGeneratedSource.Length} chars generated. Check/Save/Start now uses this script while Blocks is selected.");
         };
         root.Controls.Add(host, 0, 1);
 

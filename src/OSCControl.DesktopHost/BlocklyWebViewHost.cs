@@ -52,10 +52,12 @@ internal sealed class BlocklyWebViewHost : UserControl
             }
 
             var source = root.TryGetProperty("source", out var sourceElement) ? sourceElement.GetString() ?? string.Empty : string.Empty;
+            var reason = root.TryGetProperty("reason", out var reasonElement) ? reasonElement.GetString() ?? string.Empty : string.Empty;
             var workspaceJson = root.TryGetProperty("workspaceJson", out var workspaceElement) ? workspaceElement.GetString() ?? string.Empty : string.Empty;
             GeneratedScriptReceived?.Invoke(this, new BlocklyGeneratedScript
             {
                 Source = source,
+                Reason = reason,
                 WorkspaceJson = workspaceJson
             });
         }

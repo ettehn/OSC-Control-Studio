@@ -26,3 +26,9 @@ dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.
 ```
 
 This requires the `Microsoft.Web.WebView2` NuGet package to be restorable in the local environment.
+
+## Built-in scenarios
+
+The page includes scenario templates for startup logging, OSC receive-to-send forwarding, VRChat startup Chatbox, and VRChat parameter-to-input mapping.
+
+When hosted through WebView2, workspace changes automatically send generated `.osccontrol` text to the desktop host; the `Apply To Desktop` button sends immediately.
