@@ -701,29 +701,26 @@ internal sealed class MainForm : Form
                 return;
             }
 
-            using var dialog = new FolderBrowserDialog
-            {
-                Description = L("Select output folder for packaged app.", "Select output folder for packaged app."),
-                ShowNewFolderButton = true
-            };
+            var scriptPath = _pathTextBox.Text.Trim();
+            var appName = string.IsNullOrWhiteSpace(scriptPath)
+                ? "OSCControlApp"
+                : Path.GetFileNameWithoutExtension(scriptPath);
+            var defaultOutputRoot = GetDefaultPackageOutputRoot(scriptPath);
+            var detectedHostSource = FindAppHostSourceDirectory();
+
+            using var dialog = new PackageAppDialog(appName, defaultOutputRoot, detectedHostSource, _useSimplifiedChinese);
             if (dialog.ShowDialog(this) != DialogResult.OK)
             {
                 return;
             }
 
-            var scriptPath = _pathTextBox.Text.Trim();
-            var appName = string.IsNullOrWhiteSpace(scriptPath)
-                ? "OSCControlApp"
-                : Path.GetFileNameWithoutExtension(scriptPath);
-            var hostSource = FindAppHostSourceDirectory();
-
             var package = await new PackagedAppBuilder().BuildAsync(new PackageBuildRequest
             {
                 Source = source,
                 ScriptPath = string.IsNullOrWhiteSpace(scriptPath) ? null : scriptPath,
-                OutputRoot = dialog.SelectedPath,
-                AppName = appName,
-                HostSource = hostSource
+                OutputRoot = dialog.OutputRoot,
+                AppName = dialog.AppName,
+                HostSource = dialog.HostSource
             });
 
             var hostMessage = package.HostCopied
@@ -743,7 +740,7 @@ internal sealed class MainForm : Form
 
             UpdateStatus(L("Package failed", "Package failed"));
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException or InvalidOperationException)
         {
             AppendRuntimeOutput($"{L("Package failed", "Package failed")}: {ex.Message}");
             UpdateStatus(L("Package failed", "Package failed"));
@@ -1757,6 +1754,22 @@ internal sealed class MainForm : Form
 
     private static string FormatDisplayValue(string value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 
+    private static string GetDefaultPackageOutputRoot(string scriptPath)
+    {
+        if (!string.IsNullOrWhiteSpace(scriptPath))
+        {
+            var scriptDirectory = Path.GetDirectoryName(Path.GetFullPath(scriptPath));
+            if (!string.IsNullOrWhiteSpace(scriptDirectory))
+            {
+                return Path.Combine(scriptDirectory, "packages");
+            }
+        }
+
+        var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        return string.IsNullOrWhiteSpace(documents)
+            ? Path.Combine(Directory.GetCurrentDirectory(), "packages")
+            : Path.Combine(documents, "OSCControl Packages");
+    }
     private static string? FindAppHostSourceDirectory()
     {
         foreach (var candidate in EnumerateAppHostCandidates())

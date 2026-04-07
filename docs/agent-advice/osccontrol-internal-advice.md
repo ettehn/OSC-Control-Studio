@@ -254,6 +254,7 @@ Resolved since the prior advice pass:
 - explicit `AppHost <package-root>` now resolves `<package-root>\app\app.manifest.json` consistently.
 - `PackagedAppBuilder` now rejects `HostSource` values that overlap the generated target `host` folder, avoiding destructive self-copy cases.
 - `PackagedAppBuilderTests` now include an overlap guard test.
+- `DesktopHost` now has an explicit packaging settings dialog for app name, output folder, and host source.
 
 Validation performed after these changes:
 
@@ -264,8 +265,7 @@ Validation performed after these changes:
 
 Remaining active issues:
 
-- `DesktopHost` still needs a more explicit packaging settings surface for app name, output folder, and host source.
-- DesktopHost host binary probing is still development-oriented and should become a release-configured setting before product distribution.
+- DesktopHost host binary probing is now only a development fallback/default; product distribution should still provide a published host source explicitly.
 - AppHost root/path logic is still private; process smoke covers it for now, but extracting a testable resolver remains reasonable if this code grows.
 - Add plan codec round-trip tests that cover endpoints, states, rules, functions, branch/loop steps, and nested expressions.
 - Add a packaging smoke test for host-copy mode and run-command contents.
@@ -274,8 +274,8 @@ Remaining active issues:
 Suggested forward plan:
 
 1. Productize DesktopHost packaging.
-   - Add an explicit packaging settings surface for app name, output folder, and host source.
-   - Keep source-tree host probing as a development fallback only.
+   - Keep source-tree host probing as a development fallback/default only.
+   - Add persisted packaging preferences if users need repeated exports with the same host source.
    - Move packaging orchestration out of `MainForm` once the workflow grows beyond the current button handler.
 
 2. Improve focused coverage.

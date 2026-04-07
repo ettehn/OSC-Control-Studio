@@ -1,4 +1,4 @@
-﻿# OSCControl 用户说明
+# OSCControl 用户说明
 
 OSCControl 是一个 Windows 桌面工具，用来把 OSC、WebSocket 和 VRChat OSC 的自动化逻辑写成规则，然后运行或打包成一个可分发的小应用。
 
@@ -241,7 +241,13 @@ on vrchat.param GestureLeft [
 
 ## 打包应用
 
-桌面端点击 `Package App...` 会生成一个应用目录，典型结构如下：
+桌面端点击 `Package App...` 会先打开打包设置窗口。常用字段：
+
+- `App name`：生成的应用目录名和 manifest 名称。
+- `Output folder`：应用包输出到哪个父目录。
+- `Host source`：可选，指向已构建或已发布的 `OSCControl.AppHost` 目录。留空时会只生成 `app/` payload，稍后需要手动补 host 文件。
+
+确认后会生成一个应用目录，典型结构如下：
 
 ```text
 SampleApp/
