@@ -80,6 +80,7 @@ internal sealed class RuntimeExpressionEvaluator
             "now" => scope.Clock.UtcNow.ToString("O", CultureInfo.InvariantCulture),
             "timestamp" => scope.Clock.UtcNow.ToUnixTimeMilliseconds(),
             "exists" => scope.State.Contains(RuntimeValueHelpers.ToStringValue(arguments.FirstOrDefault())),
+            "env" => RuntimeEnvironmentProbe.Evaluate(arguments, scope.Clock),
             _ => throw new InvalidOperationException($"Unknown runtime function '{name}'.")
         };
     }

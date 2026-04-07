@@ -233,6 +233,36 @@ on startup [
             entry => Assert.Equal(2d, entry.Value));
     }
 
+    [Fact]
+    public async Task EnvironmentFunctions_ReturnRuntimeValues()
+    {
+        const string source = """
+on startup [
+    log info env("time.utc")
+    log info env("process.id")
+    log info env("tcp.listening", 0)
+]
+""";
+
+        var plan = Assert.IsType<RuntimePlan>(new CompilerPipeline().Compile(source).Plan);
+        var clock = new FakeRuntimeClock(new DateTimeOffset(2026, 4, 6, 12, 0, 0, TimeSpan.Zero));
+        var logs = new RecordingRuntimeLogSink();
+        var engine = new RuntimeEngine(plan, new RuntimeEngineOptions
+        {
+            Clock = clock,
+            LogSink = logs
+        });
+
+        var result = await engine.StartAsync();
+
+        Assert.Equal(1, result.MatchedRules);
+        Assert.Collection(
+            logs.Entries,
+            entry => Assert.Equal("2026-04-06T12:00:00.0000000+00:00", entry.Value),
+            entry => Assert.True(RuntimeValueHelpers.ToNumber(entry.Value) > 0),
+            entry => Assert.False(Assert.IsType<bool>(entry.Value)));
+    }
+
     private sealed class FakeRuntimeClock : IRuntimeClock
     {
         public FakeRuntimeClock(DateTimeOffset utcNow)

@@ -570,6 +570,37 @@
       "helpUrl": ""
     },
     {
+      "type": "osc_expr_env",
+      "message0": "environment %1",
+      "args0": [
+        { "type": "field_dropdown", "name": "KEY", "options": [["UTC time", "time.utc"], ["local time", "time.local"], ["timestamp", "time.timestamp"], ["process CPU %", "process.cpuPercent"], ["process memory bytes", "process.memoryBytes"], ["process thread count", "process.threadCount"], ["system memory load %", "system.memoryLoadPercent"], ["system available memory bytes", "system.memoryAvailableBytes"], ["processor count", "system.processorCount"], ["OS", "system.os"], ["architecture", "system.arch"], ["TCP listener count", "tcp.listenerCount"]] }
+      ],
+      "output": null,
+      "colour": 200,
+      "tooltip": "Read runtime environment data.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_tcp_listening",
+      "message0": "TCP port %1 listening on host %2",
+      "args0": [
+        { "type": "field_number", "name": "PORT", "value": 9000, "min": 0, "max": 65535, "precision": 1 },
+        { "type": "field_input", "name": "HOST", "text": "" }
+      ],
+      "output": null,
+      "colour": 200,
+      "tooltip": "Return true when a local TCP listener exists on the port. Host is optional; leave blank to match any local address.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_env_snapshot",
+      "message0": "environment snapshot",
+      "output": null,
+      "colour": 200,
+      "tooltip": "Return an object containing time, process, system, and TCP listener count fields.",
+      "helpUrl": ""
+    },
+    {
       "type": "osc_expr_raw",
       "message0": "raw expression %1",
       "args0": [

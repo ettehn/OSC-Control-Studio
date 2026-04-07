@@ -16,6 +16,7 @@
       Scenario
       <select id="templateSelect">
         <option value="startup-log">Startup log</option>
+        <option value="environment-log">Environment log</option>
         <option value="osc-forward">OSC receive to OSC send</option>
         <option value="vrchat-chatbox">VRChat startup chatbox</option>
         <option value="vrchat-param-input">VRChat param to input</option>
@@ -80,6 +81,9 @@
       <block type="osc_expr_call1">
         <value name="ARG"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
       </block>
+      <block type="osc_expr_env"></block>
+      <block type="osc_expr_tcp_listening"></block>
+      <block type="osc_expr_env_snapshot"></block>
       <block type="osc_expr_raw"></block>
     </category>
     <category name="Rules" colour="#0891b2">

@@ -306,6 +306,20 @@
     return [expression(block.getFieldValue('SOURCE'), 'arg(0)'), generator.ORDER_ATOMIC];
   };
 
+  generator.forBlock.osc_expr_env = function (block) {
+    const key = stringLiteral(block.getFieldValue('KEY') || 'time.local');
+    return [`env(${key})`, generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_tcp_listening = function (block) {
+    const port = Math.min(65535, Math.max(0, Number(block.getFieldValue('PORT')) || 0));
+    const host = (block.getFieldValue('HOST') || '').trim();
+    return [host ? `env("tcp.listening", ${port}, ${stringLiteral(host)})` : `env("tcp.listening", ${port})`, generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_env_snapshot = function () {
+    return ['env()', generator.ORDER_ATOMIC];
+  };
   generator.forBlock.osc_log_expr = function (block) {
     const level = identifier(block.getFieldValue('LEVEL'), 'info');
     const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || '""';

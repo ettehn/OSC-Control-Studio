@@ -11,6 +11,35 @@
           </statement>
         </block>
       </xml>`,
+    'environment-log': `
+      <xml xmlns="https://developers.google.com/blockly/xml">
+        <block type="osc_startup_rule" x="32" y="32">
+          <statement name="STACK">
+            <block type="osc_log">
+              <field name="LEVEL">info</field>
+              <field name="VALUE">concat(&quot;time=&quot;, env(&quot;time.local&quot;))</field>
+              <next>
+                <block type="osc_log">
+                  <field name="LEVEL">info</field>
+                  <field name="VALUE">concat(&quot;cpu=&quot;, string(env(&quot;process.cpuPercent&quot;)), &quot;%&quot;)</field>
+                  <next>
+                    <block type="osc_log">
+                      <field name="LEVEL">info</field>
+                      <field name="VALUE">concat(&quot;memory=&quot;, string(env(&quot;system.memoryLoadPercent&quot;)), &quot;%&quot;)</field>
+                      <next>
+                        <block type="osc_log">
+                          <field name="LEVEL">info</field>
+                          <field name="VALUE">concat(&quot;tcp9000=&quot;, string(env(&quot;tcp.listening&quot;, 9000)))</field>
+                        </block>
+                      </next>
+                    </block>
+                  </next>
+                </block>
+              </next>
+            </block>
+          </statement>
+        </block>
+      </xml>`,
     'osc-forward': `
       <xml xmlns="https://developers.google.com/blockly/xml">
         <block type="osc_endpoint_udp" x="32" y="32">
