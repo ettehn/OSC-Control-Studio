@@ -14,6 +14,9 @@
 
   <PropertyGroup Condition="'$(EnableBlocklyWebView2)' == 'true'">
     <DefineConstants>$(DefineConstants);OSCCONTROL_BLOCKLY_WEBVIEW2</DefineConstants>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <OutputPath>bin\$(Configuration)\$(TargetFramework)-blockly\</OutputPath>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(EnableBlocklyWebView2)' == 'true'">
