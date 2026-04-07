@@ -46,6 +46,30 @@
     <category name="Variables" colour="#9333ea">
       <block type="osc_variable"></block>
       <block type="osc_store"></block>
+      <block type="osc_store_expr">
+        <value name="VALUE">
+          <shadow type="osc_expr_raw"><field name="SOURCE">count + 1</field></shadow>
+        </value>
+      </block>
+    </category>
+    <category name="Expressions" colour="#7c3aed">
+      <block type="osc_expr_number"></block>
+      <block type="osc_expr_string"></block>
+      <block type="osc_expr_boolean"></block>
+      <block type="osc_expr_identifier"></block>
+      <block type="osc_expr_arg"></block>
+      <block type="osc_expr_msg_field"></block>
+      <block type="osc_expr_binary">
+        <value name="LEFT"><shadow type="osc_expr_arg"></shadow></value>
+        <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
+      </block>
+      <block type="osc_expr_unary">
+        <value name="VALUE"><shadow type="osc_expr_boolean"></shadow></value>
+      </block>
+      <block type="osc_expr_call1">
+        <value name="ARG"><shadow type="osc_expr_arg"></shadow></value>
+      </block>
+      <block type="osc_expr_raw"></block>
     </category>
     <category name="Rules" colour="#0891b2">
       <block type="osc_startup_rule"></block>
@@ -56,13 +80,43 @@
     </category>
     <category name="Actions" colour="#d97706">
       <block type="osc_log"></block>
+      <block type="osc_log_expr">
+        <value name="VALUE"><shadow type="osc_expr_arg"></shadow></value>
+      </block>
       <block type="osc_send_simple"></block>
       <block type="osc_send_body"></block>
     </category>
     <category name="Control" colour="#16a34a">
       <block type="osc_if"></block>
+      <block type="osc_if_expr">
+        <value name="CONDITION">
+          <shadow type="osc_expr_binary">
+            <field name="OP">&gt;</field>
+            <value name="LEFT"><shadow type="osc_expr_arg"></shadow></value>
+            <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
+          </shadow>
+        </value>
+      </block>
       <block type="osc_if_else"></block>
+      <block type="osc_if_else_expr">
+        <value name="CONDITION">
+          <shadow type="osc_expr_binary">
+            <field name="OP">==</field>
+            <value name="LEFT"><shadow type="osc_expr_arg"></shadow></value>
+            <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">1</field></shadow></value>
+          </shadow>
+        </value>
+      </block>
       <block type="osc_while"></block>
+      <block type="osc_while_expr">
+        <value name="CONDITION">
+          <shadow type="osc_expr_binary">
+            <field name="OP">&lt;</field>
+            <value name="LEFT"><shadow type="osc_expr_identifier"><field name="NAME">count</field></shadow></value>
+            <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">3</field></shadow></value>
+          </shadow>
+        </value>
+      </block>
       <block type="osc_stop"></block>
       <block type="osc_break"></block>
       <block type="osc_continue"></block>
@@ -70,8 +124,17 @@
     <category name="VRChat" colour="#db2777">
       <block type="vrchat_chat"></block>
       <block type="vrchat_input"></block>
+      <block type="vrchat_input_expr">
+        <value name="VALUE"><shadow type="osc_expr_arg"></shadow></value>
+      </block>
       <block type="vrchat_param"></block>
+      <block type="vrchat_param_expr">
+        <value name="VALUE"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
+      </block>
       <block type="vrchat_typing"></block>
+      <block type="vrchat_typing_expr">
+        <value name="VALUE"><shadow type="osc_expr_boolean"></shadow></value>
+      </block>
     </category>
     <category name="Raw" colour="#6b7280">
       <block type="osc_raw_step"></block>

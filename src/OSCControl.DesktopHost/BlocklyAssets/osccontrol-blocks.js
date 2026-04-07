@@ -319,5 +319,230 @@
       "tooltip": "Emit a raw OSCControl statement while the Blockly mapping is incomplete.",
       "helpUrl": ""
     }
+    ,
+    {
+      "type": "osc_expr_number",
+      "message0": "number %1",
+      "args0": [
+        { "type": "field_number", "name": "VALUE", "value": 0 }
+      ],
+      "output": null,
+      "colour": 260,
+      "tooltip": "Number literal.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_string",
+      "message0": "text %1",
+      "args0": [
+        { "type": "field_input", "name": "VALUE", "text": "text" }
+      ],
+      "output": null,
+      "colour": 260,
+      "tooltip": "String literal.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_boolean",
+      "message0": "boolean %1",
+      "args0": [
+        { "type": "field_dropdown", "name": "VALUE", "options": [["true", "true"], ["false", "false"]] }
+      ],
+      "output": null,
+      "colour": 260,
+      "tooltip": "Boolean literal.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_identifier",
+      "message0": "state/local %1",
+      "args0": [
+        { "type": "field_input", "name": "NAME", "text": "count" }
+      ],
+      "output": null,
+      "colour": 260,
+      "tooltip": "Reference a state variable or local value.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_arg",
+      "message0": "arg %1",
+      "args0": [
+        { "type": "field_number", "name": "INDEX", "value": 0, "min": 0, "precision": 1 }
+      ],
+      "output": null,
+      "colour": 260,
+      "tooltip": "Read an OSC argument by index.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_msg_field",
+      "message0": "message %1",
+      "args0": [
+        { "type": "field_dropdown", "name": "FIELD", "options": [["address", "address"], ["body", "body"], ["source", "source"], ["target", "target"]] }
+      ],
+      "output": null,
+      "colour": 260,
+      "tooltip": "Read a message property.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_binary",
+      "message0": "%1 %2 %3",
+      "args0": [
+        { "type": "input_value", "name": "LEFT" },
+        { "type": "field_dropdown", "name": "OP", "options": [["+", "+"], ["-", "-"], ["*", "*"], ["/", "/"], ["%", "%"], ["==", "=="], ["!=", "!="], ["<", "<"], ["<=", "<="], [">", ">"], [">=", ">="], ["and", "and"], ["or", "or"]] },
+        { "type": "input_value", "name": "RIGHT" }
+      ],
+      "inputsInline": true,
+      "output": null,
+      "colour": 260,
+      "tooltip": "Binary expression operator.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_unary",
+      "message0": "%1 %2",
+      "args0": [
+        { "type": "field_dropdown", "name": "OP", "options": [["not", "not"], ["-", "-"]] },
+        { "type": "input_value", "name": "VALUE" }
+      ],
+      "inputsInline": true,
+      "output": null,
+      "colour": 260,
+      "tooltip": "Unary expression operator.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_call1",
+      "message0": "%1 ( %2 )",
+      "args0": [
+        { "type": "field_dropdown", "name": "FUNC", "options": [["count", "count"], ["int", "int"], ["float", "float"], ["string", "string"], ["bool", "bool"], ["json", "json"], ["round", "round"]] },
+        { "type": "input_value", "name": "ARG" }
+      ],
+      "inputsInline": true,
+      "output": null,
+      "colour": 260,
+      "tooltip": "Call a one-argument built-in function.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_expr_raw",
+      "message0": "raw expression %1",
+      "args0": [
+        { "type": "field_input", "name": "SOURCE", "text": "arg(0)" }
+      ],
+      "output": null,
+      "colour": 260,
+      "tooltip": "Use a raw OSCControl expression.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_log_expr",
+      "message0": "log %1 value %2",
+      "args0": [
+        { "type": "field_dropdown", "name": "LEVEL", "options": [["info", "info"], ["warn", "warn"], ["error", "error"]] },
+        { "type": "input_value", "name": "VALUE" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 60,
+      "tooltip": "Write a runtime log entry from an expression.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_store_expr",
+      "message0": "store %1 = %2",
+      "args0": [
+        { "type": "field_input", "name": "NAME", "text": "count" },
+        { "type": "input_value", "name": "VALUE" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 60,
+      "tooltip": "Update a state variable from an expression.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_if_expr",
+      "message0": "if %1 %2 %3",
+      "args0": [
+        { "type": "input_value", "name": "CONDITION" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "THEN" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 120,
+      "tooltip": "Run nested steps when an expression is true.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_if_else_expr",
+      "message0": "if %1 %2 then %3 else %4",
+      "args0": [
+        { "type": "input_value", "name": "CONDITION" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "THEN" },
+        { "type": "input_statement", "name": "ELSE" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 120,
+      "tooltip": "Run one of two nested step lists based on an expression.",
+      "helpUrl": ""
+    },
+    {
+      "type": "osc_while_expr",
+      "message0": "while %1 %2 %3",
+      "args0": [
+        { "type": "input_value", "name": "CONDITION" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "DO" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 120,
+      "tooltip": "Repeat nested steps while an expression is true.",
+      "helpUrl": ""
+    },
+    {
+      "type": "vrchat_input_expr",
+      "message0": "VRChat input %1 = %2",
+      "args0": [
+        { "type": "field_input", "name": "INPUT", "text": "Jump" },
+        { "type": "input_value", "name": "VALUE" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 30,
+      "tooltip": "Set a VRChat input from an expression.",
+      "helpUrl": ""
+    },
+    {
+      "type": "vrchat_param_expr",
+      "message0": "VRChat param %1 = %2",
+      "args0": [
+        { "type": "field_input", "name": "PARAM", "text": "GestureLeft" },
+        { "type": "input_value", "name": "VALUE" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 30,
+      "tooltip": "Set a VRChat avatar parameter from an expression.",
+      "helpUrl": ""
+    },
+    {
+      "type": "vrchat_typing_expr",
+      "message0": "VRChat typing %1",
+      "args0": [
+        { "type": "input_value", "name": "VALUE" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 30,
+      "tooltip": "Set VRChat chatbox typing state from an expression.",
+      "helpUrl": ""
+    }
   ]);
 }());

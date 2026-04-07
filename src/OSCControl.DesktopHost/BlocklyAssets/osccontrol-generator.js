@@ -6,6 +6,8 @@
   const generator = new Blockly.Generator('OSCControl');
   generator.forBlock = generator.forBlock || Object.create(null);
   generator.INDENT = '    ';
+  generator.ORDER_ATOMIC = 0;
+  generator.ORDER_NONE = 99;
 
   generator.init = function () {};
   generator.finish = function (code) {
@@ -167,6 +169,102 @@
     return `${source}\n`;
   };
 
+  generator.forBlock.osc_expr_number = function (block) {
+    return [String(Number(block.getFieldValue('VALUE')) || 0), generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_string = function (block) {
+    return [stringLiteral(block.getFieldValue('VALUE') || ''), generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_boolean = function (block) {
+    return [block.getFieldValue('VALUE') === 'false' ? 'false' : 'true', generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_identifier = function (block) {
+    return [identifier(block.getFieldValue('NAME'), 'count'), generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_arg = function (block) {
+    const index = Math.max(0, Number(block.getFieldValue('INDEX')) || 0);
+    return [`arg(${index})`, generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_msg_field = function (block) {
+    const field = identifier(block.getFieldValue('FIELD'), 'address');
+    return [`msg.${field}`, generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_binary = function (block) {
+    const left = generator.valueToCode(block, 'LEFT', generator.ORDER_NONE) || '0';
+    const right = generator.valueToCode(block, 'RIGHT', generator.ORDER_NONE) || '0';
+    const op = block.getFieldValue('OP') || '+';
+    return [`(${left} ${op} ${right})`, generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_unary = function (block) {
+    const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || 'false';
+    const op = block.getFieldValue('OP') === '-' ? '-' : 'not';
+    return [`(${op} ${value})`, generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_call1 = function (block) {
+    const func = identifier(block.getFieldValue('FUNC'), 'count');
+    const arg = generator.valueToCode(block, 'ARG', generator.ORDER_NONE) || 'null';
+    return [`${func}(${arg})`, generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_expr_raw = function (block) {
+    return [expression(block.getFieldValue('SOURCE'), 'arg(0)'), generator.ORDER_ATOMIC];
+  };
+
+  generator.forBlock.osc_log_expr = function (block) {
+    const level = identifier(block.getFieldValue('LEVEL'), 'info');
+    const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || '""';
+    return `log ${level} ${value}\n`;
+  };
+
+  generator.forBlock.osc_store_expr = function (block) {
+    const name = identifier(block.getFieldValue('NAME'), 'count');
+    const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || 'null';
+    return `store ${name} = ${value}\n`;
+  };
+
+  generator.forBlock.osc_if_expr = function (block) {
+    const condition = generator.valueToCode(block, 'CONDITION', generator.ORDER_NONE) || 'true';
+    const body = generator.statementToCode(block, 'THEN') || '    log info "then"\n';
+    return `if ${condition} [\n${body}]\n`;
+  };
+
+  generator.forBlock.osc_if_else_expr = function (block) {
+    const condition = generator.valueToCode(block, 'CONDITION', generator.ORDER_NONE) || 'true';
+    const thenBody = generator.statementToCode(block, 'THEN') || '    log info "then"\n';
+    const elseBody = generator.statementToCode(block, 'ELSE') || '    log info "else"\n';
+    return `if ${condition} [\n${thenBody}]\nelse [\n${elseBody}]\n`;
+  };
+
+  generator.forBlock.osc_while_expr = function (block) {
+    const condition = generator.valueToCode(block, 'CONDITION', generator.ORDER_NONE) || 'true';
+    const body = generator.statementToCode(block, 'DO') || '    break\n';
+    return `while ${condition} [\n${body}]\n`;
+  };
+
+  generator.forBlock.vrchat_input_expr = function (block) {
+    const input = identifier(block.getFieldValue('INPUT'), 'Jump');
+    const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || '1';
+    return `vrchat.input ${input} = ${value}\n`;
+  };
+
+  generator.forBlock.vrchat_param_expr = function (block) {
+    const parameter = identifier(block.getFieldValue('PARAM'), 'GestureLeft');
+    const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || '0';
+    return `vrchat.param ${parameter} = ${value}\n`;
+  };
+
+  generator.forBlock.vrchat_typing_expr = function (block) {
+    const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || 'true';
+    return `vrchat.typing ${value}\n`;
+  };
   function identifier(value, fallback) {
     const trimmed = (value || '').trim();
     return /^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed) ? trimmed : fallback;
