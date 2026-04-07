@@ -99,6 +99,26 @@ Stop or re-scope the Blockly integration if any of these become true:
 - WebView2 distribution becomes a larger problem than the editor value.
 - workspace JSON becomes mandatory before script generation is reliable.
 
+## WebView2 Build Switch
+
+The WebView2 host path is optional so the default repository build does not require a new NuGet restore.
+
+Default build keeps using the existing WinForms Blocks editor:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\CodexProjects\Verify.ps1 -SkipTests
+```
+
+Build the experimental WebView2-hosted Blockly editor only when the `Microsoft.Web.WebView2` package is available:
+
+```powershell
+$env:APPDATA='C:\CodexProjects\.appdata'
+$env:NUGET_PACKAGES='C:\CodexProjects\.nuget\packages'
+dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj -m:1 -nr:false -v:minimal /p:EnableBlocklyWebView2=true
+```
+
+The branch currently pins `Microsoft.Web.WebView2` to `1.0.3856.49`, the latest stable version I found on NuGet while preparing this branch. In the current sandbox, the enabled build fails at restore with `NU1301` because NuGet cannot load `https://api.nuget.org/v3/index.json`.
+
 ## References
 
 - https://developers.google.com/blockly

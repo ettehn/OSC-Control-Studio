@@ -19,6 +19,10 @@ internal sealed class MainForm : Form
     private readonly TabPage _blocksTab;
     private readonly TextBox _editorTextBox;
     private TextBox _blocksPreviewTextBox = null!;
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+    private string _blocklyGeneratedSource = "on startup [\r\n    log info \"ready\"\r\n]\r\n";
+    private string _blocklyWorkspaceJson = string.Empty;
+#endif
     private readonly ListView _diagnosticsView;
     private readonly RichTextBox _runtimeOutputTextBox;
     private readonly ToolStripStatusLabel _statusLabel;
@@ -163,7 +167,11 @@ internal sealed class MainForm : Form
 
         _blocksTab = new TabPage(L("Blocks", "Blocks"));
         _editorTabs.TabPages.Add(_blocksTab);
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+        _blocksEditorRoot = CreateBlocklyWebViewEditor();
+#else
         _blocksEditorRoot = CreateBlocksEditor(monoFont);
+#endif
         _blocksTab.Controls.Add(_blocksEditorRoot);
 
         var diagnosticsTab = new TabPage(L("Diagnostics", "Diagnostics"));
@@ -203,8 +211,12 @@ internal sealed class MainForm : Form
         _controller.RuntimeOutput += message => PostToUi(() => AppendRuntimeOutput(message));
         _controller.StatusChanged += status => PostToUi(() => UpdateStatus(status));
 
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+        UpdateStatus(L("Blockly WebView2 editor is enabled. Use Send To Host in the Blocks tab to apply generated script.", "Blockly WebView2 editor is enabled. Use Send To Host in the Blocks tab to apply generated script."));
+#else
         WireBlockEvents();
         UpdateBlocksPreview();
+#endif
         RenderDiagnostics(_controller.Compile(_editorTextBox.Text));
 
         FormClosed += OnFormClosedAsync;
@@ -271,6 +283,44 @@ internal sealed class MainForm : Form
         _ => mode.ToString(),
     };
 
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+    private Control CreateBlocklyWebViewEditor()
+    {
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 2,
+            Padding = new Padding(8),
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var noteLabel = new Label
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            MaximumSize = new Size(1280, 0),
+            Text = L("Blockly WebView2 editor is experimental. Generate script in Blockly, click Send To Host, then use Check/Save/Start from the desktop host.", "Blockly WebView2 editor is experimental. Generate script in Blockly, click Send To Host, then use Check/Save/Start from the desktop host."),
+            ForeColor = Color.FromArgb(55, 55, 55),
+            Margin = new Padding(0, 0, 0, 8),
+        };
+        root.Controls.Add(noteLabel, 0, 0);
+
+        var host = new BlocklyWebViewHost(BlocklyEditorAssets.GetIndexPath());
+        host.GeneratedScriptReceived += (_, script) =>
+        {
+            _blocklyGeneratedSource = string.IsNullOrWhiteSpace(script.Source) ? _blocklyGeneratedSource : script.Source;
+            _blocklyWorkspaceJson = script.WorkspaceJson;
+            _editorTextBox.Text = _blocklyGeneratedSource;
+            RenderDiagnostics(_controller.Compile(_blocklyGeneratedSource));
+            UpdateStatus(L("Received Blockly generated script.", "Received Blockly generated script."));
+        };
+        root.Controls.Add(host, 0, 1);
+
+        return root;
+    }
+#endif
     private Control CreateBlocksEditor(Font monoFont)
     {
         _endpointBindingSource.DataSource = _blocks.Endpoints;
@@ -1813,7 +1863,11 @@ internal sealed class MainForm : Form
         }
     }
 
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+    private string GetCurrentSource() => _editorTabs.SelectedTab == _blocksTab ? _blocklyGeneratedSource : _editorTextBox.Text;
+#else
     private string GetCurrentSource() => _editorTabs.SelectedTab == _blocksTab ? _blocksPreviewTextBox.Text : _editorTextBox.Text;
+#endif
     private void UpdateStepHint()
     {
         var step = SelectedStep;
@@ -1983,7 +2037,9 @@ internal sealed class MainForm : Form
 
     private void ResetBottomSplit()
     {
+#if !OSCCONTROL_BLOCKLY_WEBVIEW2
         InitializeBlockSplitters();
+#endif
     }
 
     private sealed record StepContainerContext(BindingList<BlockStep> Steps, BlockStep? Owner);
