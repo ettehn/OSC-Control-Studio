@@ -1,6 +1,7 @@
 using System.Text.Json;
 using OSCControl.Compiler.Compiler;
 using OSCControl.Compiler.Runtime;
+using OSCControl.Packaging;
 
 namespace OSCControl.AppHost;
 
@@ -14,23 +15,23 @@ internal static class Program
 
     public static async Task<int> Main(string[] args)
     {
-        var appRoot = args.Length > 0 ? Path.GetFullPath(args[0]) : AppContext.BaseDirectory;
-        var manifestPath = Path.Combine(appRoot, "app.manifest.json");
-        if (!File.Exists(manifestPath))
+        var appRoot = ResolveAppRoot(args);
+        if (appRoot is null)
         {
-            Console.Error.WriteLine($"Manifest not found: {manifestPath}");
+            var baseDirectory = AppContext.BaseDirectory;
+            Console.Error.WriteLine("Manifest not found.");
+            Console.Error.WriteLine($"Checked: {Path.Combine(baseDirectory, "app.manifest.json")}");
+            Console.Error.WriteLine($"Checked: {Path.Combine(baseDirectory, "app", "app.manifest.json")}");
+            Console.Error.WriteLine($"Checked: {Path.Combine(Path.GetFullPath(Path.Combine(baseDirectory, "..")), "app", "app.manifest.json")}");
             Console.Error.WriteLine("Usage: OSCControl.AppHost <packaged-app-folder>");
             return 2;
         }
 
-        var manifest = JsonSerializer.Deserialize<AppManifest>(await File.ReadAllTextAsync(manifestPath), JsonOptions) ?? new AppManifest();
+        var manifestPath = Path.Combine(appRoot, "app.manifest.json");
+        var manifest = JsonSerializer.Deserialize<PackagedAppManifest>(await File.ReadAllTextAsync(manifestPath), JsonOptions) ?? new PackagedAppManifest();
         var scriptPath = Path.Combine(appRoot, manifest.Script);
-        if (!File.Exists(scriptPath))
-        {
-            Console.Error.WriteLine($"Script not found: {scriptPath}");
-            return 2;
-        }
 
+        Directory.CreateDirectory(Path.GetFullPath(Path.Combine(appRoot, manifest.Data)));
         Directory.CreateDirectory(Path.GetFullPath(Path.Combine(appRoot, manifest.Logs)));
 
         var plan = await LoadPlanAsync(appRoot, manifest, scriptPath);
@@ -74,7 +75,26 @@ internal static class Program
         return 0;
     }
 
-    private static async Task<RuntimePlan?> LoadPlanAsync(string appRoot, AppManifest manifest, string scriptPath)
+    private static string? ResolveAppRoot(string[] args)
+    {
+        if (args.Length > 0)
+        {
+            var explicitRoot = Path.GetFullPath(args[0]);
+            return File.Exists(Path.Combine(explicitRoot, "app.manifest.json")) ? explicitRoot : null;
+        }
+
+        var baseDirectory = AppContext.BaseDirectory;
+        var candidates = new[]
+        {
+            baseDirectory,
+            Path.Combine(baseDirectory, "app"),
+            Path.Combine(Path.GetFullPath(Path.Combine(baseDirectory, "..")), "app")
+        };
+
+        return candidates.FirstOrDefault(candidate => File.Exists(Path.Combine(candidate, "app.manifest.json")));
+    }
+
+    private static async Task<RuntimePlan?> LoadPlanAsync(string appRoot, PackagedAppManifest manifest, string scriptPath)
     {
         if (!string.IsNullOrWhiteSpace(manifest.Plan))
         {
@@ -93,6 +113,12 @@ internal static class Program
                     Console.Error.WriteLine("Falling back to app.osccontrol compilation.");
                 }
             }
+        }
+
+        if (!File.Exists(scriptPath))
+        {
+            Console.Error.WriteLine($"Script not found: {scriptPath}");
+            return null;
         }
 
         var source = await File.ReadAllTextAsync(scriptPath);

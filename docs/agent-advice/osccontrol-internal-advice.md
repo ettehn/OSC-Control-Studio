@@ -206,3 +206,61 @@ The strongest path forward is:
 - compile to a runtime plan
 - ship a fixed host with bundled runtime and generated payload
 - integrate OSCControl into a larger generator as a domain logic module, not as a second app platform
+
+## Current Structure Review After AppHost And Packager Split
+
+The repository has already moved toward the recommended shape.
+
+Current project split:
+
+- `C:\CodexProjects\src\OSCControl.Compiler`
+  - compiler and runtime core
+- `C:\CodexProjects\src\OSCControl.DesktopHost`
+  - editor, script view, runtime preview, and Blocks UI
+- `C:\CodexProjects\src\OSCControl.AppHost`
+  - end-user runtime host for packaged apps
+- `C:\CodexProjects\src\OSCControl.Packager`
+  - packages script, plan, manifest, and optional host files
+- `C:\CodexProjects\src\oscctlc`
+  - development CLI for diagnostics and runtime inspection
+
+The current pipeline is now close to:
+
+```text
+Blocks / Script
+  -> CompilerPipeline
+  -> RuntimePlanJsonCodec
+  -> Packager
+  -> app/ + host/ + data/ + logs/
+  -> AppHost
+```
+
+What is already good:
+
+- `OSCControl.AppHost` exists and is separate from the editor.
+- `OSCControl.Packager` exists and produces the intended `app`, `host`, `data`, and `logs` layout.
+- packaged artifacts under `C:\CodexProjects\artifacts\packaged-plan-codec` show the target shape working at a file-layout level.
+- `AppHost` loads `app.plan.json` first and falls back to compiling `app.osccontrol` if the plan is missing or invalid.
+- `Packager` compiles the script before packaging and emits `app.plan.json`, so the production path can avoid startup-time compilation.
+- `AppHost` and `Packager` currently build successfully with `dotnet build --no-restore`.
+
+Issues and risks:
+
+- `OSCControl.DesktopHost` does not appear to have a packaging UI entry point yet. The editor can build and run scripts, but it is not yet the user-facing "generate packaged app" workflow.
+- `run.cmd` currently calls `dotnet host\OSCControl.AppHost.dll app`. This is acceptable for framework-dependent distribution, but a generated end-user app should prefer `host\OSCControl.AppHost.exe app` when the exe exists.
+- `AppHost` expects the manifest in the folder passed as its argument. This works because `run.cmd` passes `app`, but no-arg startup from the packaged root should probably try `app\app.manifest.json` before failing.
+- `AppManifest` and `PackagedAppManifest` duplicate the same fields. This is tolerable now, but the duplication will become fragile if manifest fields grow.
+- `ConsoleRuntimeSinks` is duplicated between `OSCControl.AppHost` and `oscctlc`. This is low risk, but it is a cleanup candidate.
+- The packaged app has `data` and `logs`, but the manifest only models logs today. If persistent state becomes real product behavior, `data` should be represented in the manifest and used consistently by `AppHost`.
+- The DesktopHost project still mixes editor UI, Blocks UI, localization, preview, and runtime control in a very large `MainForm.cs`. This is not blocking the packaging direction, but future UI iteration will become harder unless packaging and Blocks logic are kept out of `MainForm`.
+- Tests could not be run in the reviewed environment because NuGet restore attempted to access `https://api.nuget.org/v3/index.json` and failed. Build checks for `AppHost` and `Packager` passed, but test coverage was not confirmed.
+
+Recommended next steps:
+
+- Add a DesktopHost command such as `Package App...` that invokes the same packaging path as `OSCControl.Packager`.
+- Update generated `run.cmd` to prefer `host\OSCControl.AppHost.exe app`, with a fallback to `dotnet host\OSCControl.AppHost.dll app` if needed.
+- Make `AppHost` no-arg startup friendlier by trying both the current base directory and an `app` child directory.
+- Move manifest DTOs into a shared location if new manifest fields are added.
+- Consider moving console runtime sinks into a shared utility only if duplication starts to affect behavior.
+- Keep `OSCControl.Packager` as the CLI source of truth for packaging, and let DesktopHost call or share that logic rather than reimplementing a second packager.
+- Add a small package smoke test once dependency restore is stable: package a trivial script, run `AppHost` against the packaged `app` folder, and verify it loads the plan.

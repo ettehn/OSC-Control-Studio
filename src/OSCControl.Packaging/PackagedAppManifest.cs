@@ -1,6 +1,6 @@
-namespace OSCControl.AppHost;
+namespace OSCControl.Packaging;
 
-internal sealed class AppManifest
+public sealed class PackagedAppManifest
 {
     public string Name { get; set; } = "OSCControl App";
 
@@ -8,5 +8,7 @@ internal sealed class AppManifest
 
     public string? Plan { get; set; } = "app.plan.json";
 
-    public string Logs { get; set; } = "logs";
+    public string Data { get; set; } = "../data";
+
+    public string Logs { get; set; } = "../logs";
 }

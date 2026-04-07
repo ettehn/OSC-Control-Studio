@@ -7,6 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\OSCControl.Compiler\OSCControl.Compiler.csproj" />
+    <ProjectReference Include="..\OSCControl.Packaging\OSCControl.Packaging.csproj" />
   </ItemGroup>
 </Project>

@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using OSCControl.Compiler.Compiler;
 using OSCControl.Compiler.Diagnostics;
+using OSCControl.Packaging;
 
 namespace OSCControl.DesktopHost;
 
@@ -23,6 +24,7 @@ internal sealed class MainForm : Form
     private readonly Button _reloadButton;
     private readonly Button _saveButton;
     private readonly Button _checkButton;
+    private readonly Button _packageButton;
     private readonly Button _startButton;
     private readonly Button _stopButton;
     private SplitContainer _blocksOuterSplit = null!;
@@ -76,12 +78,12 @@ internal sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            ColumnCount = 7,
+            ColumnCount = 8,
             Margin = new Padding(0, 0, 0, 12),
         };
         topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < 6; i++)
         {
             topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
@@ -115,13 +117,16 @@ internal sealed class MainForm : Form
         _checkButton = CreateButton(L("Check", "Check"), async (_, _) => await CheckAsync());
         topPanel.Controls.Add(_checkButton, 5, 0);
 
+        _packageButton = CreateButton(L("Package App...", "Package App..."), async (_, _) => await PackageAppAsync());
+        topPanel.Controls.Add(_packageButton, 6, 0);
+
         var runPanel = new FlowLayoutPanel
         {
             AutoSize = true,
             FlowDirection = FlowDirection.LeftToRight,
             Margin = new Padding(8, 0, 0, 0),
         };
-        topPanel.Controls.Add(runPanel, 6, 0);
+        topPanel.Controls.Add(runPanel, 7, 0);
 
         _startButton = CreateButton(L("Start", "Start"), async (_, _) => await StartAsync());
         runPanel.Controls.Add(_startButton);
@@ -643,6 +648,74 @@ internal sealed class MainForm : Form
         UpdateStatus(result.HasErrors ? L("Diagnostics found", "Diagnostics found") : L("Ready", "Ready"));
         return Task.CompletedTask;
     }
+
+    private async Task PackageAppAsync()
+    {
+        await SetBusyAsync(true);
+        try
+        {
+            var source = GetCurrentSource();
+            var compileResult = _controller.Compile(source);
+            RenderDiagnostics(compileResult);
+            if (compileResult.HasErrors)
+            {
+                UpdateStatus(L("Fix diagnostics before packaging.", "Fix diagnostics before packaging."));
+                return;
+            }
+
+            using var dialog = new FolderBrowserDialog
+            {
+                Description = L("Select output folder for packaged app.", "Select output folder for packaged app."),
+                ShowNewFolderButton = true
+            };
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            var scriptPath = _pathTextBox.Text.Trim();
+            var appName = string.IsNullOrWhiteSpace(scriptPath)
+                ? "OSCControlApp"
+                : Path.GetFileNameWithoutExtension(scriptPath);
+            var hostSource = FindAppHostSourceDirectory();
+
+            var package = await new PackagedAppBuilder().BuildAsync(new PackageBuildRequest
+            {
+                Source = source,
+                ScriptPath = string.IsNullOrWhiteSpace(scriptPath) ? null : scriptPath,
+                OutputRoot = dialog.SelectedPath,
+                AppName = appName,
+                HostSource = hostSource
+            });
+
+            var hostMessage = package.HostCopied
+                ? L("Host files copied.", "Host files copied.")
+                : L("Host files were not found; copy OSCControl.AppHost into the host folder before distribution.", "Host files were not found; copy OSCControl.AppHost into the host folder before distribution.");
+            AppendRuntimeOutput($"{L("Packaged app", "Packaged app")}: {package.AppRoot}");
+            AppendRuntimeOutput(hostMessage);
+            UpdateStatus($"{L("Packaged app", "Packaged app")}: {package.AppRoot}");
+            MessageBox.Show(this, $"{L("Packaged app", "Packaged app")}:\r\n{package.AppRoot}\r\n\r\n{hostMessage}", L("Package App", "Package App"), MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (PackageBuildException ex)
+        {
+            foreach (var diagnostic in ex.Diagnostics)
+            {
+                AppendRuntimeOutput($"{diagnostic.Severity} {diagnostic.Span.Start.Line}:{diagnostic.Span.Start.Column}: {diagnostic.Message}");
+            }
+
+            UpdateStatus(L("Package failed", "Package failed"));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
+        {
+            AppendRuntimeOutput($"{L("Package failed", "Package failed")}: {ex.Message}");
+            UpdateStatus(L("Package failed", "Package failed"));
+        }
+        finally
+        {
+            SetEditingEnabled(true);
+        }
+    }
+
     private async Task StartAsync()
     {
         await SetBusyAsync(true);
@@ -1570,8 +1643,50 @@ internal sealed class MainForm : Form
 
     private static string FormatDisplayValue(string value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 
-    private string GetCurrentSource() => _editorTabs.SelectedTab == _blocksTab ? _blocksPreviewTextBox.Text : _editorTextBox.Text;
+    private static string? FindAppHostSourceDirectory()
+    {
+        foreach (var candidate in EnumerateAppHostCandidates())
+        {
+            if (File.Exists(Path.Combine(candidate, "OSCControl.AppHost.exe")) || File.Exists(Path.Combine(candidate, "OSCControl.AppHost.dll")))
+            {
+                return candidate;
+            }
+        }
 
+        return null;
+    }
+
+    private static IEnumerable<string> EnumerateAppHostCandidates()
+    {
+        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        AddWorkspaceRoot(AppContext.BaseDirectory, roots);
+        AddWorkspaceRoot(Directory.GetCurrentDirectory(), roots);
+
+        foreach (var root in roots)
+        {
+            yield return Path.Combine(root, "artifacts", "apphost");
+            yield return Path.Combine(root, "src", "OSCControl.AppHost", "bin", "Debug", "net8.0");
+            yield return Path.Combine(root, "src", "OSCControl.AppHost", "bin", "Release", "net8.0");
+        }
+    }
+
+    private static void AddWorkspaceRoot(string startDirectory, ISet<string> roots)
+    {
+        var directory = new DirectoryInfo(startDirectory);
+        while (directory is not null)
+        {
+            var marker = Path.Combine(directory.FullName, "src", "OSCControl.AppHost", "OSCControl.AppHost.csproj");
+            if (File.Exists(marker))
+            {
+                roots.Add(directory.FullName);
+                return;
+            }
+
+            directory = directory.Parent;
+        }
+    }
+
+    private string GetCurrentSource() => _editorTabs.SelectedTab == _blocksTab ? _blocksPreviewTextBox.Text : _editorTextBox.Text;
     private void UpdateStepHint()
     {
         var step = SelectedStep;
@@ -1712,6 +1827,7 @@ internal sealed class MainForm : Form
         _reloadButton.Enabled = enabled;
         _saveButton.Enabled = enabled;
         _checkButton.Enabled = enabled;
+        _packageButton.Enabled = enabled;
         _startButton.Enabled = enabled && !_controller.IsRunning;
         _stopButton.Enabled = enabled && _controller.IsRunning;
     }
