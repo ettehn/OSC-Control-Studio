@@ -15,4 +15,9 @@
     <ProjectReference Include="..\OSCControl.Compiler\OSCControl.Compiler.csproj" />
     <ProjectReference Include="..\OSCControl.Packaging\OSCControl.Packaging.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="BlocklyAssets\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>
