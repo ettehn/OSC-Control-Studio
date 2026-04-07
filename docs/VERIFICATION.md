@@ -1,34 +1,40 @@
 # OSCControl Verification Notes
 
-This repository is often built in constrained Windows environments where the default user NuGet config may be inaccessible and external network access to `https://api.nuget.org/v3/index.json` may fail.
-
-Recommended environment setup before verification:
+This repository is often built in constrained Windows environments where the default user NuGet config may be inaccessible. Use the repository script for normal verification:
 
 ```powershell
-New-Item -ItemType Directory -Force -Path C:\CodexProjects\.appdata\NuGet | Out-Null
-$env:APPDATA = 'C:\CodexProjects\.appdata'
+.\Verify.ps1
 ```
 
-The repo already contains `C:\CodexProjects\NuGet.Config`; use it together with the repo-local package cache.
-
-Core build checks:
+For build-only verification:
 
 ```powershell
-dotnet build C:\CodexProjects\src\OSCControl.Compiler\OSCControl.Compiler.csproj --configfile C:\CodexProjects\NuGet.Config -p:RestorePackagesPath=C:\CodexProjects\.nuget\packages -m:1 -nr:false -v:minimal
-dotnet build C:\CodexProjects\src\OSCControl.Packaging\OSCControl.Packaging.csproj --configfile C:\CodexProjects\NuGet.Config -p:RestorePackagesPath=C:\CodexProjects\.nuget\packages -m:1 -nr:false -v:minimal
-dotnet build C:\CodexProjects\src\OSCControl.AppHost\OSCControl.AppHost.csproj --configfile C:\CodexProjects\NuGet.Config -p:RestorePackagesPath=C:\CodexProjects\.nuget\packages -m:1 -nr:false -v:minimal
-dotnet build C:\CodexProjects\src\OSCControl.Packager\OSCControl.Packager.csproj --configfile C:\CodexProjects\NuGet.Config -p:RestorePackagesPath=C:\CodexProjects\.nuget\packages -m:1 -nr:false -v:minimal
-dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj --configfile C:\CodexProjects\NuGet.Config -p:RestorePackagesPath=C:\CodexProjects\.nuget\packages -m:1 -nr:false -v:minimal
+.\Verify.ps1 -SkipTests
 ```
 
-Test checks, when packages are already restored:
+The script sets:
+
+- `APPDATA=C:\CodexProjects\.appdata`
+- `NUGET_PACKAGES=C:\CodexProjects\.nuget\packages`
+
+It then builds the core projects and the compiler test harness with `-m:1 -nr:false -v:minimal`.
+
+Core projects covered:
+
+- `OSCControl.Compiler`
+- `OSCControl.Packaging`
+- `OSCControl.AppHost`
+- `OSCControl.Packager`
+- `OSCControl.DesktopHost`
+
+Test verification is run through the in-repo console harness, not the NuGet-based VSTest/xUnit adapter:
 
 ```powershell
-$env:APPDATA = 'C:\CodexProjects\.appdata'
-dotnet test C:\CodexProjects\tests\OSCControl.Compiler.Tests\OSCControl.Compiler.Tests.csproj --no-restore -m:1 -nr:false -v:minimal
+dotnet build C:\CodexProjects\tests\OSCControl.Compiler.Tests\OSCControl.Compiler.Tests.csproj -m:1 -nr:false -v:minimal
+dotnet run --project C:\CodexProjects\tests\OSCControl.Compiler.Tests\OSCControl.Compiler.Tests.csproj --no-restore --no-build
 ```
 
-If the test command fails with `NU1301` for `https://api.nuget.org/v3/index.json`, treat it as a restore/network issue unless a compiler error is also present.
+In this sandbox, the WebSocket server listener test may be skipped when `HttpListener` cannot start because of an invalid handle. That skip is reported explicitly by the harness.
 
 Minimal packaging smoke check:
 

@@ -1,58 +1,60 @@
-﻿# NuGet Restore Issue Notes
+# NuGet Restore Issue Notes
 
-## Symptom
+## Status
 
-In this workspace, test/build commands that need package restore can fail with:
+Repository verification no longer depends on downloading test packages from NuGet.
+
+The repo now uses:
+
+- `Directory.Build.props` to pin restore to `NuGet.Config` and `.nuget/packages` inside the repository.
+- `Verify.ps1` to set `APPDATA` to `C:\CodexProjects\.appdata` before invoking `dotnet`.
+- An in-repo test harness for `tests\OSCControl.Compiler.Tests`, replacing the previous `Microsoft.NET.Test.Sdk` / `xunit` package references.
+
+## Remaining Environment Constraint
+
+In this sandbox, plain `dotnet build` or `dotnet test` can still fail before project restore if NuGet tries to read:
 
 ```text
-error NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json
+C:\Users\Ethen\AppData\Roaming\NuGet\NuGet.Config
 ```
 
-Earlier runs also hit a sandbox-specific user config access problem:
+Use the repository verification script instead of raw `dotnet` commands:
 
-```text
-Access to the path 'C:\Users\Ethen\AppData\Roaming\NuGet\NuGet.Config' is denied.
+```powershell
+.\Verify.ps1
 ```
 
-## Current Interpretation
+For build-only verification:
 
-Treat this as an environment / restore problem, not a source-code failure, unless a compiler error appears after restore succeeds.
+```powershell
+.\Verify.ps1 -SkipTests
+```
 
-The core projects have been buildable when using a repo-local app data directory and package cache:
+## Manual Commands
 
-- `OSCControl.Compiler`
-- `OSCControl.Packaging`
-- `OSCControl.AppHost`
-- `OSCControl.Packager`
-- `OSCControl.DesktopHost`
-
-The xUnit test project can still be blocked because it depends on NuGet packages such as xUnit and Microsoft.NET.Test.Sdk.
-
-## Recommended Workaround
-
-Use a repo-local app data directory before running verification commands:
+If you need to run commands manually, set local app data first:
 
 ```powershell
 New-Item -ItemType Directory -Force -Path C:\CodexProjects\.appdata\NuGet | Out-Null
 $env:APPDATA = 'C:\CodexProjects\.appdata'
+$env:NUGET_PACKAGES = 'C:\CodexProjects\.nuget\packages'
 ```
 
-Then prefer repo-local config/cache flags:
+Build with single-node MSBuild in this environment:
 
 ```powershell
-dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj --configfile C:\CodexProjects\NuGet.Config -p:RestorePackagesPath=C:\CodexProjects\.nuget\packages -m:1 -nr:false -v:minimal
+dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj -m:1 -nr:false -v:minimal
 ```
 
-For tests, only use `--no-restore` when test packages are already restored:
+Run compiler tests through the in-repo harness:
 
 ```powershell
-dotnet test C:\CodexProjects\tests\OSCControl.Compiler.Tests\OSCControl.Compiler.Tests.csproj --no-restore -m:1 -nr:false -v:minimal
+dotnet build C:\CodexProjects\tests\OSCControl.Compiler.Tests\OSCControl.Compiler.Tests.csproj -m:1 -nr:false -v:minimal
+dotnet run --project C:\CodexProjects\tests\OSCControl.Compiler.Tests\OSCControl.Compiler.Tests.csproj --no-restore --no-build
 ```
 
-If this still reports `NU1301`, restore is still blocked.
+`dotnet test` is intentionally not the primary path for this test project because the project no longer uses the NuGet-based VSTest/xUnit adapter.
 
-## Follow-Up Options
+## If `NU1301` Reappears
 
-- Ensure network access to `https://api.nuget.org/v3/index.json` in the development environment.
-- Pre-restore packages into `C:\CodexProjects\.nuget\packages` before running offline checks.
-- Keep using core project builds and packaging smoke tests as fallback verification when xUnit restore is blocked.
+Treat `NU1301` as a restore/environment problem unless compiler errors appear after restore succeeds. It usually means a new external `PackageReference` was added or the command did not use the repo-local `APPDATA` setup.
