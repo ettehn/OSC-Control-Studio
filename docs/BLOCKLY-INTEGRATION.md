@@ -117,18 +117,18 @@ The WebView2 host path is optional so the default repository build does not requ
 Default build keeps using the existing WinForms Blocks editor:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File C:\CodexProjects\Verify.ps1 -SkipTests
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Verify.ps1 -SkipTests
 ```
 
 Build the experimental WebView2-hosted Blockly editor only when the `Microsoft.Web.WebView2` package is available:
 
 ```powershell
-$env:APPDATA='C:\CodexProjects\.appdata'
-$env:NUGET_PACKAGES='C:\CodexProjects\.nuget\packages'
-dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj -m:1 -nr:false -v:minimal /p:EnableBlocklyWebView2=true
+$env:APPDATA=(Join-Path (Get-Location) '.appdata')
+$env:NUGET_PACKAGES=(Join-Path (Get-Location) '.nuget\packages')
+dotnet build .\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj -m:1 -nr:false -v:minimal /p:EnableBlocklyWebView2=true
 ```
 
-The branch currently pins `Microsoft.Web.WebView2` to `1.0.3856.49`.
+The project currently pins `Microsoft.Web.WebView2` to `1.0.3856.49` when the WebView2 build switch is enabled.
 
 ## Vendored Blockly Assets
 
