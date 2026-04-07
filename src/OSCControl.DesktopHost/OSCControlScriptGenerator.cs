@@ -14,7 +14,7 @@ internal static class OSCControlScriptGenerator
 
         AppendHeader(builder);
         AppendEndpoints(builder, document, endpointNames);
-        AppendStates(builder, document.Rules);
+        AppendVariables(builder, document);
         AppendRules(builder, document, endpointNames);
 
         return builder.ToString().TrimEnd() + Environment.NewLine;
@@ -114,50 +114,62 @@ internal static class OSCControlScriptGenerator
         builder.AppendLine("}");
     }
 
-    private static void AppendStates(StringBuilder builder, IEnumerable<BlockRule> rules)
+    private static void AppendVariables(StringBuilder builder, BlockDocument document)
     {
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var states = new List<string>();
+        var variables = new List<BlockVariable>();
 
-        foreach (var rule in rules)
+        foreach (var variable in document.Variables)
         {
-            CollectStates(rule.Steps, states, used);
+            if (string.IsNullOrWhiteSpace(variable.Name))
+            {
+                continue;
+            }
+
+            var name = MakeUniqueIdentifier(variable.Name, "state_value", used);
+            variables.Add(new BlockVariable { Name = name, InitialValue = variable.InitialValue });
         }
 
-        foreach (var state in states)
+        foreach (var rule in document.Rules)
         {
-            builder.Append("state ");
-            builder.Append(state);
-            builder.AppendLine(" = null");
+            CollectStoredVariables(rule.Steps, variables, used);
         }
 
-        if (states.Count > 0)
+        foreach (var variable in variables)
+        {
+            builder.Append("var ");
+            builder.Append(variable.Name);
+            builder.Append(" = ");
+            builder.AppendLine(FormatExpression(variable.InitialValue, "null"));
+        }
+
+        if (variables.Count > 0)
         {
             builder.AppendLine();
         }
     }
 
-    private static void CollectStates(IEnumerable<BlockStep> steps, ICollection<string> states, ISet<string> used)
+    private static void CollectStoredVariables(IEnumerable<BlockStep> steps, ICollection<BlockVariable> variables, ISet<string> used)
     {
         foreach (var step in steps)
         {
             if (step.Kind == BlockStepKind.Store && !string.IsNullOrWhiteSpace(step.Target))
             {
                 var stateName = MakeUniqueIdentifier(step.Target, "state_value", used, allowExistingBaseName: true);
-                if (!states.Contains(stateName, StringComparer.OrdinalIgnoreCase))
+                if (!variables.Any(variable => variable.Name.Equals(stateName, StringComparison.OrdinalIgnoreCase)))
                 {
-                    states.Add(stateName);
+                    variables.Add(new BlockVariable { Name = stateName, InitialValue = "null" });
                 }
             }
 
             if (step.Children.Count > 0)
             {
-                CollectStates(step.Children, states, used);
+                CollectStoredVariables(step.Children, variables, used);
             }
 
             if (step.ElseChildren.Count > 0)
             {
-                CollectStates(step.ElseChildren, states, used);
+                CollectStoredVariables(step.ElseChildren, variables, used);
             }
         }
     }
@@ -614,6 +626,11 @@ internal static class OSCControlScriptGenerator
             }
 
             if (step.Children.Count > 0 && UsesVrchat(step.Children))
+            {
+                return true;
+            }
+
+            if (step.ElseChildren.Count > 0 && UsesVrchat(step.ElseChildren))
             {
                 return true;
             }

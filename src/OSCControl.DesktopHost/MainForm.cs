@@ -10,6 +10,7 @@ internal sealed class MainForm : Form
     private readonly RuntimeAppController _controller = new();
     private readonly BlockDocument _blocks = BlockDocument.CreateDefault();
     private readonly BindingSource _endpointBindingSource = new();
+    private readonly BindingSource _variableBindingSource = new();
     private readonly BindingSource _ruleBindingSource = new();
     private readonly BindingSource _stepBindingSource = new();
     private readonly TextBox _pathTextBox;
@@ -28,9 +29,11 @@ internal sealed class MainForm : Form
     private readonly Button _startButton;
     private readonly Button _stopButton;
     private SplitContainer _blocksOuterSplit = null!;
+    private SplitContainer _blocksConfigSplit = null!;
     private SplitContainer _blocksInnerSplit = null!;
     private SplitContainer _blocksRuleSplit = null!;
     private DataGridView _endpointGrid = null!;
+    private DataGridView _variableGrid = null!;
     private ListBox _rulesListBox = null!;
     private ComboBox _triggerComboBox = null!;
     private TextBox _ruleEndpointTextBox = null!;
@@ -271,6 +274,7 @@ internal sealed class MainForm : Form
     private Control CreateBlocksEditor(Font monoFont)
     {
         _endpointBindingSource.DataSource = _blocks.Endpoints;
+        _variableBindingSource.DataSource = _blocks.Variables;
         _ruleBindingSource.DataSource = _blocks.Rules;
         _stepBindingSource.DataSource = new BindingList<BlockStep>();
 
@@ -307,6 +311,8 @@ internal sealed class MainForm : Form
         toolbar.Controls.Add(CreateButton(L("Add Endpoint", "Add Endpoint"), (_, _) => AddEndpoint()));
         toolbar.Controls.Add(CreateButton(L("Add VRChat Endpoint", "Add VRChat Endpoint"), (_, _) => AddVrchatEndpoint()));
         toolbar.Controls.Add(CreateButton(L("Remove Endpoint", "Remove Endpoint"), (_, _) => RemoveSelectedEndpoint()));
+        toolbar.Controls.Add(CreateButton(L("Add Variable", "Add Variable"), (_, _) => AddVariable()));
+        toolbar.Controls.Add(CreateButton(L("Remove Variable", "Remove Variable"), (_, _) => RemoveSelectedVariable()));
         toolbar.Controls.Add(CreateButton(L("Import Script To Blocks", "Import Script To Blocks"), (_, _) => ImportScriptToBlocks()));
         toolbar.Controls.Add(CreateButton(L("Preview Script", "Preview Script"), (_, _) => UpdateBlocksPreview()));
         toolbar.Controls.Add(CreateButton(L("Apply To Script", "Apply To Script"), (_, _) => ApplyBlocksToScript()));
@@ -320,13 +326,22 @@ internal sealed class MainForm : Form
         };
         root.Controls.Add(_blocksOuterSplit, 0, 2);
 
+        _blocksConfigSplit = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            Orientation = Orientation.Vertical,
+            BorderStyle = BorderStyle.None,
+            SplitterWidth = 8,
+        };
+        _blocksOuterSplit.Panel1.Controls.Add(_blocksConfigSplit);
+
         var endpointsGroup = new GroupBox
         {
             Text = L("Endpoints", "Endpoints"),
             Dock = DockStyle.Fill,
             Padding = new Padding(8),
         };
-        _blocksOuterSplit.Panel1.Controls.Add(endpointsGroup);
+        _blocksConfigSplit.Panel1.Controls.Add(endpointsGroup);
 
         _endpointGrid = CreateGrid();
         _endpointGrid.DataSource = _endpointBindingSource;
@@ -340,6 +355,19 @@ internal sealed class MainForm : Form
         _endpointGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockEndpoint.Codec), HeaderText = L("Codec", "Codec"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 12 });
         endpointsGroup.Controls.Add(_endpointGrid);
 
+        var variablesGroup = new GroupBox
+        {
+            Text = L("Variables", "Variables"),
+            Dock = DockStyle.Fill,
+            Padding = new Padding(8),
+        };
+        _blocksConfigSplit.Panel2.Controls.Add(variablesGroup);
+
+        _variableGrid = CreateGrid();
+        _variableGrid.DataSource = _variableBindingSource;
+        _variableGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockVariable.Name), HeaderText = L("Name", "Name"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 45 });
+        _variableGrid.Columns.Add(new DataGridViewTextBoxColumn { DataPropertyName = nameof(BlockVariable.InitialValue), HeaderText = L("Initial", "Initial"), AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill, FillWeight = 55 });
+        variablesGroup.Controls.Add(_variableGrid);
         _blocksInnerSplit = new SplitContainer
         {
             Dock = DockStyle.Fill,
@@ -575,6 +603,11 @@ internal sealed class MainForm : Form
         _endpointGrid.RowsRemoved += (_, _) => UpdateBlocksPreview();
         _endpointGrid.CurrentCellDirtyStateChanged += (_, _) => CommitGridEdit(_endpointGrid);
         _endpointGrid.DataError += (_, _) => { };
+
+        _variableGrid.CellValueChanged += (_, _) => UpdateBlocksPreview();
+        _variableGrid.RowsRemoved += (_, _) => UpdateBlocksPreview();
+        _variableGrid.CurrentCellDirtyStateChanged += (_, _) => CommitGridEdit(_variableGrid);
+        _variableGrid.DataError += (_, _) => { };
 
         _stepsListBox.SelectedIndexChanged += (_, _) => BindSelectedStep();
         _stepsListBox.DrawItem += DrawStepItem;
@@ -885,6 +918,32 @@ internal sealed class MainForm : Form
         }
 
         _blocks.Endpoints.Remove(endpoint);
+        UpdateBlocksPreview();
+    }
+
+    private void AddVariable()
+    {
+        var index = _blocks.Variables.Count + 1;
+        var variable = new BlockVariable
+        {
+            Name = index == 1 ? "count" : $"variable{index}",
+            InitialValue = "0"
+        };
+
+        _blocks.Variables.Add(variable);
+        _variableBindingSource.ResetBindings(false);
+        UpdateBlocksPreview();
+    }
+
+    private void RemoveSelectedVariable()
+    {
+        if (_variableGrid.CurrentRow?.DataBoundItem is not BlockVariable variable)
+        {
+            return;
+        }
+
+        _blocks.Variables.Remove(variable);
+        _variableBindingSource.ResetBindings(false);
         UpdateBlocksPreview();
     }
 
@@ -1404,7 +1463,12 @@ internal sealed class MainForm : Form
             return;
         }
 
-        if (!TryInitializeHorizontalSplit(_blocksOuterSplit, 120, 220, 150))
+        if (!TryInitializeHorizontalSplit(_blocksOuterSplit, 170, 220, 210))
+        {
+            return;
+        }
+
+        if (!TryInitializeVerticalSplit(_blocksConfigSplit, 520, 260, 860))
         {
             return;
         }
@@ -1519,6 +1583,12 @@ internal sealed class MainForm : Form
                 _blocks.Endpoints.Add(CloneEndpoint(endpoint));
             }
 
+            _blocks.Variables.Clear();
+            foreach (var variable in document.Variables)
+            {
+                _blocks.Variables.Add(CloneVariable(variable));
+            }
+
             _blocks.Rules.Clear();
             foreach (var rule in document.Rules)
             {
@@ -1527,6 +1597,7 @@ internal sealed class MainForm : Form
 
             _endpointBindingSource.ResetBindings(false);
             RefreshRuleDisplay();
+            _variableBindingSource.ResetBindings(false);
             _rulesListBox.ClearSelected();
             if (_blocks.Rules.Count > 0)
             {
@@ -1552,6 +1623,11 @@ internal sealed class MainForm : Form
         Codec = source.Codec,
     };
 
+    private static BlockVariable CloneVariable(BlockVariable source) => new()
+    {
+        Name = source.Name,
+        InitialValue = source.InitialValue,
+    };
     private void DrawRuleItem(object? sender, DrawItemEventArgs e)
     {
         e.DrawBackground();
@@ -1899,23 +1975,3 @@ internal sealed class MainForm : Form
 
     private sealed record StepContainerContext(BindingList<BlockStep> Steps, BlockStep? Owner);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

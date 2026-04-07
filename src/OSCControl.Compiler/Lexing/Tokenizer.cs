@@ -9,6 +9,7 @@ public sealed class Tokenizer
     {
         ["endpoint"] = TokenKind.KeywordEndpoint,
         ["state"] = TokenKind.KeywordState,
+        ["var"] = TokenKind.KeywordVar,
         ["func"] = TokenKind.KeywordFunc,
         ["on"] = TokenKind.KeywordOn,
         ["receive"] = TokenKind.KeywordReceive,

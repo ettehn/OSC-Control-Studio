@@ -33,6 +33,7 @@ public enum TokenKind
 
     KeywordEndpoint,
     KeywordState,
+    KeywordVar,
     KeywordFunc,
     KeywordOn,
     KeywordReceive,

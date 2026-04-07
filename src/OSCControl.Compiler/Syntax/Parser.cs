@@ -48,7 +48,7 @@ public sealed class Parser
         return Current.Kind switch
         {
             TokenKind.KeywordEndpoint => ParseEndpointDeclaration(),
-            TokenKind.KeywordState => ParseStateDeclaration(),
+            TokenKind.KeywordState or TokenKind.KeywordVar => ParseStateDeclaration(),
             TokenKind.KeywordFunc => ParseFunctionDeclaration(),
             TokenKind.KeywordOn => ParseRuleDeclaration(),
             _ => UnexpectedDeclaration()
@@ -95,7 +95,9 @@ public sealed class Parser
 
     private StateDeclarationSyntax ParseStateDeclaration()
     {
-        var start = Consume(TokenKind.KeywordState).Span.Start;
+        var start = Current.Kind == TokenKind.KeywordVar
+            ? Consume(TokenKind.KeywordVar).Span.Start
+            : Consume(TokenKind.KeywordState).Span.Start;
         var name = ParseIdentifier();
         Consume(TokenKind.Equal);
         var value = ParseExpression();
@@ -709,6 +711,7 @@ public sealed class Parser
         while (Current.Kind is not TokenKind.EndOfFile &&
                Current.Kind is not TokenKind.KeywordEndpoint &&
                Current.Kind is not TokenKind.KeywordState &&
+               Current.Kind is not TokenKind.KeywordVar &&
                Current.Kind is not TokenKind.KeywordFunc &&
                Current.Kind is not TokenKind.KeywordOn &&
                !IsVrchatIdentifier(Current))

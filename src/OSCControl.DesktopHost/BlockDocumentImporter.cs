@@ -32,7 +32,12 @@ internal static class BlockDocumentImporter
                     }
                     break;
                 }
-                case StateDeclarationSyntax:
+                case StateDeclarationSyntax state:
+                    document.Variables.Add(new BlockVariable
+                    {
+                        Name = state.Name.Name,
+                        InitialValue = FormatInputExpression(state.Value)
+                    });
                     break;
                 default:
                     warnings.Add($"Skipped unsupported declaration: {declaration.GetType().Name}");
@@ -468,4 +473,3 @@ internal static class BlockDocumentImporter
 }
 
 internal sealed record BlockImportResult(BlockDocument Document, IReadOnlyList<string> Warnings);
-

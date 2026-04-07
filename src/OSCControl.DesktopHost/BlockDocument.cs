@@ -6,6 +6,8 @@ internal sealed class BlockDocument
 {
     public BindingList<BlockEndpoint> Endpoints { get; } = [];
 
+    public BindingList<BlockVariable> Variables { get; } = [];
+
     public BindingList<BlockRule> Rules { get; } = [];
 
     public static BlockDocument CreateDefault()
@@ -36,6 +38,15 @@ internal sealed class BlockDocument
         document.Rules.Add(startupRule);
         return document;
     }
+}
+
+internal sealed class BlockVariable
+{
+    public string Name { get; set; } = "count";
+
+    public string InitialValue { get; set; } = "0";
+
+    public override string ToString() => $"{Name} = {InitialValue}";
 }
 
 internal sealed class BlockEndpoint
