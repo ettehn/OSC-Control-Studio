@@ -50,7 +50,7 @@
     },
     {
       "type": "osc_variable",
-      "message0": "variable %1 = %2",
+      "message0": "declare variable %1 = %2",
       "args0": [
         { "type": "field_input", "name": "NAME", "text": "count" },
         { "type": "field_input", "name": "VALUE", "text": "0" }
@@ -356,24 +356,24 @@
     },
     {
       "type": "osc_expr_identifier",
-      "message0": "state/local %1",
+      "message0": "raw name %1",
       "args0": [
         { "type": "field_input", "name": "NAME", "text": "count" }
       ],
       "output": null,
       "colour": 260,
-      "tooltip": "Reference a state variable or local value.",
+      "tooltip": "Reference a raw variable name or local value.",
       "helpUrl": ""
     },
     {
       "type": "osc_expr_variable",
-      "message0": "variable value %1",
+      "message0": "reference variable %1",
       "args0": [
         { "type": "field_input", "name": "NAME", "text": "count" }
       ],
       "output": null,
       "colour": 300,
-      "tooltip": "Reference a variable declared with a top-level variable block.",
+      "tooltip": "Reference a variable declared with a top-level variable block as an expression input.",
       "helpUrl": ""
     },
     {
