@@ -8,6 +8,38 @@
   generator.INDENT = '    ';
   generator.ORDER_ATOMIC = 0;
   generator.ORDER_NONE = 99;
+  const VRCHAT_READONLY_AVATAR_PARAMETERS = new Set([
+    'afk',
+    'angulary',
+    'avatarversion',
+    'earmuffs',
+    'eyeheightasmeters',
+    'eyeheightaspercent',
+    'gestureleft',
+    'gestureleftweight',
+    'gestureright',
+    'gesturerightweight',
+    'grounded',
+    'instation',
+    'isanimatorenabled',
+    'islocal',
+    'isonfriendslist',
+    'muteself',
+    'previewmode',
+    'scalefactor',
+    'scalefactorinverse',
+    'scalemodified',
+    'seated',
+    'trackingtype',
+    'upright',
+    'velocitymagnitude',
+    'velocityx',
+    'velocityy',
+    'velocityz',
+    'viseme',
+    'voice',
+    'vrmode'
+  ]);
 
   generator.init = function () {};
   generator.finish = function (code) {
@@ -83,8 +115,14 @@
     return `on vrchat.avatar_change [\n${body}]\n\n`;
   };
 
-  generator.forBlock.vrchat_param_rule = function (block) {
+  generator.forBlock.vrchat_builtin_param_rule = function (block) {
     const parameter = identifier(block.getFieldValue('PARAM'), 'GestureLeft');
+    const body = generator.statementToCode(block, 'STACK') || '    log info arg(0)\n';
+    return `on vrchat.param ${parameter} [\n${body}]\n\n`;
+  };
+
+  generator.forBlock.vrchat_param_rule = function (block) {
+    const parameter = customVrchatParameter(block.getFieldValue('PARAM'), 'CustomParam');
     const body = generator.statementToCode(block, 'STACK') || '    log info arg(0)\n';
     return `on vrchat.param ${parameter} [\n${body}]\n\n`;
   };
@@ -160,7 +198,7 @@
   };
 
   generator.forBlock.vrchat_param = function (block) {
-    const parameter = identifier(block.getFieldValue('PARAM'), 'GestureLeft');
+    const parameter = writableVrchatParameter(block.getFieldValue('PARAM'), 'CustomParam');
     const value = expressionOrString(block.getFieldValue('VALUE'));
     return `vrchat.param ${parameter} = ${value}\n`;
   };
@@ -266,7 +304,7 @@
   };
 
   generator.forBlock.vrchat_param_expr = function (block) {
-    const parameter = identifier(block.getFieldValue('PARAM'), 'GestureLeft');
+    const parameter = writableVrchatParameter(block.getFieldValue('PARAM'), 'CustomParam');
     const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || '0';
     return `vrchat.param ${parameter} = ${value}\n`;
   };
@@ -278,6 +316,19 @@
   function identifier(value, fallback) {
     const trimmed = (value || '').trim();
     return /^[A-Za-z_][A-Za-z0-9_]*$/.test(trimmed) ? trimmed : fallback;
+  }
+
+  function customVrchatParameter(value, fallback) {
+    const parameter = identifier(value, fallback);
+    return isReadOnlyVrchatAvatarParameter(parameter) ? fallback : parameter;
+  }
+
+  function writableVrchatParameter(value, fallback) {
+    return customVrchatParameter(value, fallback);
+  }
+
+  function isReadOnlyVrchatAvatarParameter(value) {
+    return VRCHAT_READONLY_AVATAR_PARAMETERS.has(String(value || '').toLowerCase());
   }
 
   function portNumber(value, fallback) {

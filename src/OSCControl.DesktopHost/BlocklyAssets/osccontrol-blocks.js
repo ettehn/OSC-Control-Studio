@@ -132,17 +132,31 @@
       "helpUrl": ""
     },
     {
-      "type": "vrchat_param_rule",
-      "message0": "when VRChat param %1 changes %2 %3",
+      "type": "vrchat_builtin_param_rule",
+      "message0": "when VRChat read-only built-in param %1 changes %2 %3",
       "args0": [
-        { "type": "field_input", "name": "PARAM", "text": "GestureLeft" },
+        { "type": "field_dropdown", "name": "PARAM", "options": [["GestureLeft", "GestureLeft"], ["GestureRight", "GestureRight"], ["GestureLeftWeight", "GestureLeftWeight"], ["GestureRightWeight", "GestureRightWeight"], ["VelocityMagnitude", "VelocityMagnitude"], ["VelocityX", "VelocityX"], ["VelocityY", "VelocityY"], ["VelocityZ", "VelocityZ"], ["Upright", "Upright"], ["Grounded", "Grounded"], ["Seated", "Seated"], ["AFK", "AFK"], ["TrackingType", "TrackingType"], ["VRMode", "VRMode"], ["MuteSelf", "MuteSelf"], ["InStation", "InStation"], ["Earmuffs", "Earmuffs"], ["Viseme", "Viseme"], ["Voice", "Voice"], ["AngularY", "AngularY"], ["IsLocal", "IsLocal"], ["PreviewMode", "PreviewMode"], ["AvatarVersion", "AvatarVersion"], ["IsAnimatorEnabled", "IsAnimatorEnabled"], ["ScaleModified", "ScaleModified"], ["ScaleFactor", "ScaleFactor"], ["ScaleFactorInverse", "ScaleFactorInverse"], ["EyeHeightAsMeters", "EyeHeightAsMeters"], ["EyeHeightAsPercent", "EyeHeightAsPercent"], ["IsOnFriendsList", "IsOnFriendsList"]] },
         { "type": "input_dummy" },
         { "type": "input_statement", "name": "STACK" }
       ],
       "previousStatement": null,
       "nextStatement": null,
       "colour": 190,
-      "tooltip": "Run steps when a VRChat avatar parameter changes.",
+      "tooltip": "Listen to a VRChat built-in avatar parameter. Built-in parameters are read-only in VRChat and cannot be written by OSCControl.",
+      "helpUrl": "https://creators.vrchat.com/avatars/animator-parameters/"
+    },
+    {
+      "type": "vrchat_param_rule",
+      "message0": "when VRChat custom param %1 changes %2 %3",
+      "args0": [
+        { "type": "field_input", "name": "PARAM", "text": "CustomParam" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "STACK" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 190,
+      "tooltip": "Run steps when a custom VRChat avatar parameter changes. For built-in read-only parameters, prefer the dedicated built-in parameter block.",
       "helpUrl": ""
     },
     {
@@ -300,13 +314,13 @@
       "type": "vrchat_param",
       "message0": "VRChat param %1 = %2",
       "args0": [
-        { "type": "field_input", "name": "PARAM", "text": "GestureLeft" },
+        { "type": "field_input", "name": "PARAM", "text": "CustomParam" },
         { "type": "field_input", "name": "VALUE", "text": "0" }
       ],
       "previousStatement": null,
       "nextStatement": null,
       "colour": 30,
-      "tooltip": "Set a VRChat avatar parameter.",
+      "tooltip": "Set a custom VRChat avatar parameter. VRChat built-in avatar parameters such as GestureLeft and VelocityZ are read-only.",
       "helpUrl": ""
     },
     {
@@ -548,13 +562,13 @@
       "type": "vrchat_param_expr",
       "message0": "VRChat param %1 = %2",
       "args0": [
-        { "type": "field_input", "name": "PARAM", "text": "GestureLeft" },
+        { "type": "field_input", "name": "PARAM", "text": "CustomParam" },
         { "type": "input_value", "name": "VALUE" }
       ],
       "previousStatement": null,
       "nextStatement": null,
       "colour": 30,
-      "tooltip": "Set a VRChat avatar parameter from an expression.",
+      "tooltip": "Set a custom VRChat avatar parameter from an expression. VRChat built-in avatar parameters are read-only.",
       "helpUrl": ""
     },
     {

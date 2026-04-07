@@ -67,7 +67,7 @@
           <field name="INPUT_PORT">9000</field>
           <field name="OUTPUT_PORT">9001</field>
           <next>
-            <block type="vrchat_param_rule">
+            <block type="vrchat_builtin_param_rule">
               <field name="PARAM">GestureLeft</field>
               <statement name="STACK">
                 <block type="vrchat_input">
