@@ -109,7 +109,8 @@
     });
 
     state.workspace.addChangeListener(event => {
-      if (state.suppressEvents || event.isUiEvent) {
+      const isUiEvent = typeof event.isUiEvent === 'function' ? event.isUiEvent() : event.isUiEvent;
+      if (state.suppressEvents || isUiEvent) {
         return;
       }
 
@@ -136,7 +137,9 @@
     try {
       state.workspace.clear();
       Blockly.Xml.domToWorkspace(xml, state.workspace);
-      state.workspace.cleanUp();
+      if (typeof state.workspace.cleanUp === 'function') {
+        state.workspace.cleanUp();
+      }
     } finally {
       state.suppressEvents = false;
     }

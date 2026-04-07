@@ -7,24 +7,112 @@ namespace OSCControl.DesktopHost;
 
 internal sealed class BlocklyWebViewHost : UserControl
 {
+
+    private const string PageDiagnosticsScript = """
+        (() => {
+          const stringify = value => {
+            if (value instanceof Error) {
+              return value.stack || value.message;
+            }
+
+            if (typeof value === 'string') {
+              return value;
+            }
+
+            try {
+              return JSON.stringify(value);
+            } catch {
+              return String(value);
+            }
+          };
+
+          const send = (level, args) => {
+            try {
+              if (!window.chrome || !window.chrome.webview) {
+                return;
+              }
+
+              window.chrome.webview.postMessage({
+                kind: 'osccontrol-blockly-diagnostic',
+                level,
+                message: Array.from(args || []).map(stringify).join(' ')
+              });
+            } catch {
+            }
+          };
+
+          window.addEventListener('error', event => {
+            send('window.error', [event.message, event.filename, `${event.lineno}:${event.colno}`]);
+          });
+
+          window.addEventListener('unhandledrejection', event => {
+            send('unhandledrejection', [event.reason]);
+          });
+
+          const originalError = console.error;
+          console.error = (...args) => {
+            send('console.error', args);
+            originalError.apply(console, args);
+          };
+        })();
+        """;
+
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill };
     private readonly string _indexPath;
-    private readonly string _userDataFolder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "OSCControl.DesktopHost",
-        "WebView2UserData");
+    private bool _initializationStarted;
+    private string _userDataFolder = string.Empty;
 
     public BlocklyWebViewHost(string indexPath)
     {
         _indexPath = indexPath;
         Dock = DockStyle.Fill;
         Controls.Add(_webView);
-        Load += OnLoadAsync;
     }
 
     public event EventHandler<BlocklyGeneratedScript>? GeneratedScriptReceived;
 
-    private async void OnLoadAsync(object? sender, EventArgs e)
+    protected override void OnHandleCreated(EventArgs e)
+    {
+        base.OnHandleCreated(e);
+        BeginInitializationIfReady();
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        BeginInitializationIfReady();
+    }
+
+    protected override void OnSizeChanged(EventArgs e)
+    {
+        base.OnSizeChanged(e);
+        BeginInitializationIfReady();
+    }
+
+    private void BeginInitializationIfReady()
+    {
+        if (_initializationStarted || !IsHandleCreated || !Visible || Width <= 0 || Height <= 0)
+        {
+            return;
+        }
+
+        if (!_webView.IsHandleCreated)
+        {
+            _webView.CreateControl();
+        }
+
+        if (!_webView.IsHandleCreated)
+        {
+            Program.Log("Blockly WebView2 initialization deferred: WebView child handle was not created.");
+            BeginInvoke(BeginInitializationIfReady);
+            return;
+        }
+
+        _initializationStarted = true;
+        _ = InitializeAsync();
+    }
+
+    private async Task InitializeAsync()
     {
         if (!File.Exists(_indexPath))
         {
@@ -34,14 +122,24 @@ internal sealed class BlocklyWebViewHost : UserControl
 
         try
         {
-            Directory.CreateDirectory(_userDataFolder);
-            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder);
+            _userDataFolder = ResolveWritableUserDataFolder();
+            Program.Log($"Blockly WebView2 user data folder: {_userDataFolder}");
+            Program.Log($"Blockly WebView2 loading index: {_indexPath}");
+            Program.Log($"Blockly WebView2 handles: host=0x{Handle.ToInt64():X}; webView=0x{_webView.Handle.ToInt64():X}; size={_webView.Width}x{_webView.Height}; visible={Visible}/{_webView.Visible}");
+            var environmentOptions = CreateEnvironmentOptions();
+            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder, options: environmentOptions);
             await _webView.EnsureCoreWebView2Async(environment);
+            _webView.CoreWebView2.NavigationStarting += (_, args) => Program.Log($"Blockly WebView2 navigation starting: {args.Uri}");
+            _webView.CoreWebView2.NavigationCompleted += (_, args) => Program.Log($"Blockly WebView2 navigation completed: success={args.IsSuccess}; status={args.WebErrorStatus}");
+            _webView.CoreWebView2.DOMContentLoaded += (_, _) => Program.Log("Blockly WebView2 DOM content loaded.");
+            _webView.CoreWebView2.ProcessFailed += (_, args) => Program.Log($"Blockly WebView2 process failed: {args.ProcessFailedKind}");
             _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PageDiagnosticsScript);
             _webView.CoreWebView2.Navigate(new Uri(_indexPath).AbsoluteUri);
         }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or NotSupportedException or FileNotFoundException or IOException)
+        catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or NotSupportedException or FileNotFoundException or IOException or System.Runtime.InteropServices.COMException)
         {
+            Program.Log($"Blockly WebView2 initialization failed: {ex}");
             ShowInitializationError(ex);
         }
     }
@@ -52,7 +150,21 @@ internal sealed class BlocklyWebViewHost : UserControl
         {
             using var document = JsonDocument.Parse(e.WebMessageAsJson);
             var root = document.RootElement;
-            if (!root.TryGetProperty("kind", out var kind) || kind.GetString() != "osccontrol-blockly-generated-script")
+            if (!root.TryGetProperty("kind", out var kind))
+            {
+                return;
+            }
+
+            var kindText = kind.GetString();
+            if (kindText == "osccontrol-blockly-diagnostic")
+            {
+                var level = root.TryGetProperty("level", out var levelElement) ? levelElement.GetString() ?? string.Empty : string.Empty;
+                var message = root.TryGetProperty("message", out var messageElement) ? messageElement.GetString() ?? string.Empty : string.Empty;
+                Program.Log($"Blockly WebView2 page diagnostic [{level}]: {message}");
+                return;
+            }
+
+            if (kindText != "osccontrol-blockly-generated-script")
             {
                 return;
             }
@@ -60,6 +172,7 @@ internal sealed class BlocklyWebViewHost : UserControl
             var source = root.TryGetProperty("source", out var sourceElement) ? sourceElement.GetString() ?? string.Empty : string.Empty;
             var reason = root.TryGetProperty("reason", out var reasonElement) ? reasonElement.GetString() ?? string.Empty : string.Empty;
             var workspaceJson = root.TryGetProperty("workspaceJson", out var workspaceElement) ? workspaceElement.GetString() ?? string.Empty : string.Empty;
+            Program.Log($"Blockly WebView2 generated script received: reason={reason}; chars={source.Length}; workspaceJsonChars={workspaceJson.Length}");
             GeneratedScriptReceived?.Invoke(this, new BlocklyGeneratedScript
             {
                 Source = source,
@@ -67,8 +180,59 @@ internal sealed class BlocklyWebViewHost : UserControl
                 WorkspaceJson = workspaceJson
             });
         }
-        catch (JsonException)
+        catch (JsonException ex)
         {
+            Program.Log($"Blockly WebView2 message parse failed: {ex.Message}");
+        }
+    }
+
+
+    private static CoreWebView2EnvironmentOptions CreateEnvironmentOptions()
+    {
+        var browserArguments = Environment.GetEnvironmentVariable("OSCCONTROL_WEBVIEW2_BROWSER_ARGS");
+        if (string.IsNullOrWhiteSpace(browserArguments))
+        {
+            Program.Log("Blockly WebView2 browser args: (none)");
+            return new CoreWebView2EnvironmentOptions();
+        }
+
+        Program.Log($"Blockly WebView2 browser args: {browserArguments}");
+        return new CoreWebView2EnvironmentOptions(browserArguments);
+    }
+
+    private static string ResolveWritableUserDataFolder()
+    {
+        var candidates = new List<string>();
+        AddCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+        candidates.Add(Path.Combine(AppContext.BaseDirectory, ".webview2-user-data"));
+        AddCandidate(candidates, Path.GetTempPath());
+
+        foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                Directory.CreateDirectory(candidate);
+                var probePath = Path.Combine(candidate, $".write-test-{Guid.NewGuid():N}.tmp");
+                File.WriteAllText(probePath, string.Empty);
+                File.Delete(probePath);
+                return candidate;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
+            {
+                Program.Log($"Blockly WebView2 user data folder not writable: {candidate}; {ex.GetType().Name}: {ex.Message}");
+            }
+        }
+
+        throw new UnauthorizedAccessException("No writable WebView2 user data folder was found.");
+
+        static void AddCandidate(List<string> candidates, string root)
+        {
+            if (string.IsNullOrWhiteSpace(root))
+            {
+                return;
+            }
+
+            candidates.Add(Path.Combine(root, "OSCControl.DesktopHost", "WebView2UserData"));
         }
     }
 
@@ -80,8 +244,9 @@ internal sealed class BlocklyWebViewHost : UserControl
 
     private void ShowInitializationError(Exception ex)
     {
+        var userDataFolder = string.IsNullOrWhiteSpace(_userDataFolder) ? "not resolved" : _userDataFolder;
         Controls.Clear();
-        Controls.Add(CreateMessageLabel($"WebView2 could not be initialized. {ex.Message}{Environment.NewLine}{Environment.NewLine}User data folder: {_userDataFolder}"));
+        Controls.Add(CreateMessageLabel($"WebView2 could not be initialized. {ex.Message}{Environment.NewLine}{Environment.NewLine}User data folder: {userDataFolder}"));
     }
 
     private static Label CreateMessageLabel(string message)
