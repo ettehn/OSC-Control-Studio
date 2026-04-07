@@ -366,6 +366,17 @@
       "helpUrl": ""
     },
     {
+      "type": "osc_expr_variable",
+      "message0": "variable value %1",
+      "args0": [
+        { "type": "field_input", "name": "NAME", "text": "count" }
+      ],
+      "output": null,
+      "colour": 300,
+      "tooltip": "Reference a variable declared with a top-level variable block.",
+      "helpUrl": ""
+    },
+    {
       "type": "osc_expr_arg",
       "message0": "arg %1",
       "args0": [

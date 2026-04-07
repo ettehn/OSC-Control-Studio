@@ -185,6 +185,10 @@
     return [identifier(block.getFieldValue('NAME'), 'count'), generator.ORDER_ATOMIC];
   };
 
+  generator.forBlock.osc_expr_variable = function (block) {
+    return [identifier(block.getFieldValue('NAME'), 'count'), generator.ORDER_ATOMIC];
+  };
+
   generator.forBlock.osc_expr_arg = function (block) {
     const index = Math.max(0, Number(block.getFieldValue('INDEX')) || 0);
     return [`arg(${index})`, generator.ORDER_ATOMIC];
