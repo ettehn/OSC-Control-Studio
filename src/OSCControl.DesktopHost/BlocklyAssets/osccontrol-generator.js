@@ -147,7 +147,7 @@
   };
 
   generator.forBlock.vrchat_chat = function (block) {
-    const text = stringLiteral(block.getFieldValue('TEXT') || 'Hello from OSCControl');
+    const text = expressionOrString(block.getFieldValue('TEXT') || 'Hello from OSCControl');
     const send = block.getFieldValue('SEND') === 'TRUE' ? 'true' : 'false';
     const notify = block.getFieldValue('NOTIFY') === 'TRUE' ? 'true' : 'false';
     return `vrchat.chat ${text} send=${send} notify=${notify}\n`;

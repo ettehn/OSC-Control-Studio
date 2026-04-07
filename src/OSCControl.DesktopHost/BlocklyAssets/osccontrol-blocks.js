@@ -147,7 +147,7 @@
     },
     {
       "type": "osc_log",
-      "message0": "log text %1 %2",
+      "message0": "log text/expression %1 %2",
       "args0": [
         { "type": "field_dropdown", "name": "LEVEL", "options": [["info", "info"], ["warn", "warn"], ["error", "error"]] },
         { "type": "field_input", "name": "VALUE", "text": "ready" }
@@ -155,7 +155,7 @@
       "previousStatement": null,
       "nextStatement": null,
       "colour": 60,
-      "tooltip": "Write a runtime log entry.",
+      "tooltip": "Write a runtime log entry. Type any declared variable name, for example count or score, to reference it; plain text is emitted as a string.",
       "helpUrl": ""
     },
     {
@@ -271,7 +271,7 @@
     },
     {
       "type": "vrchat_chat",
-      "message0": "VRChat chatbox %1 send %2 notify %3",
+      "message0": "VRChat chatbox text/expression %1 send %2 notify %3",
       "args0": [
         { "type": "field_input", "name": "TEXT", "text": "Hello from OSCControl" },
         { "type": "field_checkbox", "name": "SEND", "checked": true },
@@ -280,7 +280,7 @@
       "previousStatement": null,
       "nextStatement": null,
       "colour": 30,
-      "tooltip": "Send text to the VRChat chatbox.",
+      "tooltip": "Send text or an expression to the VRChat chatbox. Type any declared variable name, for example count or score, to reference it.",
       "helpUrl": ""
     },
     {
