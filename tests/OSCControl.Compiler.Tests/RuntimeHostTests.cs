@@ -125,6 +125,123 @@ on receive wsIn when body("action") == "fader" [
         Assert.Equal(0.75d, Assert.IsType<double>(message.Args[1]), 3);
     }
 
+    [Fact]
+    public async Task WebSocketServerDuplex_BroadcastsRuntimeSendsToConnectedClient()
+    {
+        var port = GetFreeTcpPort();
+        var source = $$"""
+endpoint ws: ws.server {
+    mode: duplex
+    host: "127.0.0.1"
+    port: {{port}}
+    path: "/control"
+    codec: json
+}
+
+on receive ws when msg.address == "/ping" [
+    send ws {
+        address: "/pong"
+        body: "pong"
+    }
+]
+""";
+
+        var plan = Assert.IsType<RuntimePlan>(new CompilerPipeline().Compile(source).Plan);
+        var errors = new RecordingRuntimeHostErrorSink();
+        await using var engine = new RuntimeEngine(plan);
+        await using var host = new RuntimeHost(engine, new RuntimeHostOptions
+        {
+            ErrorSink = errors
+        });
+
+        try
+        {
+            await host.StartAsync();
+        }
+        catch (HttpListenerException ex) when (ex.NativeErrorCode == 6)
+        {
+            throw new SkipException("HttpListener cannot start in this sandbox: invalid handle.");
+        }
+
+        using var socket = new ClientWebSocket();
+        await socket.ConnectAsync(new Uri($"ws://127.0.0.1:{port}/control"), CancellationToken.None);
+        var payload = Encoding.UTF8.GetBytes("{\"address\":\"/ping\",\"body\":\"hello\"}");
+        await socket.SendAsync(payload, WebSocketMessageType.Text, true, CancellationToken.None);
+
+        var received = await ReceiveWebSocketTextAsync(socket);
+        Assert.Contains("/pong", received);
+        Assert.Contains("pong", received);
+        Assert.Empty(errors.Errors);
+    }
+
+    [Fact]
+    public async Task WebSocketClientInput_TriggersRuntimeRule()
+    {
+        var port = GetFreeTcpPort();
+        using var listener = new HttpListener();
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/client/");
+
+        try
+        {
+            listener.Start();
+        }
+        catch (HttpListenerException ex) when (ex.NativeErrorCode == 6)
+        {
+            throw new SkipException("HttpListener cannot start in this sandbox: invalid handle.");
+        }
+
+        var serverTask = Task.Run(async () =>
+        {
+            var context = await listener.GetContextAsync();
+            if (!context.Request.IsWebSocketRequest)
+            {
+                context.Response.StatusCode = 400;
+                context.Response.Close();
+                return;
+            }
+
+            var webSocketContext = await context.AcceptWebSocketAsync(null);
+            var payload = Encoding.UTF8.GetBytes("{\"address\":\"/hello\",\"body\":{\"value\":42}}\n");
+            await webSocketContext.WebSocket.SendAsync(payload, WebSocketMessageType.Text, true, CancellationToken.None);
+            await Task.Delay(100);
+            webSocketContext.WebSocket.Dispose();
+        });
+
+        var source = $$"""
+endpoint wsIn: ws.client {
+    mode: input
+    host: "127.0.0.1"
+    port: {{port}}
+    path: "/client"
+    codec: json
+}
+
+on receive wsIn when msg.address == "/hello" [
+    log info body("value")
+]
+""";
+
+        var plan = Assert.IsType<RuntimePlan>(new CompilerPipeline().Compile(source).Plan);
+        var logs = new RecordingRuntimeLogSink();
+        var errors = new RecordingRuntimeHostErrorSink();
+        await using var engine = new RuntimeEngine(plan, new RuntimeEngineOptions
+        {
+            LogSink = logs
+        });
+        await using var host = new RuntimeHost(engine, new RuntimeHostOptions
+        {
+            ErrorSink = errors
+        });
+
+        await host.StartAsync();
+        await WaitForAsync(() => logs.Entries.Count == 1 || errors.Errors.Count > 0);
+        await serverTask;
+
+        Assert.Empty(errors.Errors);
+        var log = Assert.Single(logs.Entries);
+        Assert.Equal(42d, Convert.ToDouble(log.Value));
+    }
+
     private static async Task WaitForAsync(Func<bool> predicate, int timeoutMs = 3000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
@@ -139,6 +256,23 @@ on receive wsIn when body("action") == "fader" [
         }
 
         Assert.True(predicate(), "Condition was not met before timeout.");
+    }
+
+    private static async Task<string> ReceiveWebSocketTextAsync(ClientWebSocket socket, int timeoutMs = 3000)
+    {
+        using var cts = new CancellationTokenSource(timeoutMs);
+        var buffer = new byte[16 * 1024];
+        using var stream = new MemoryStream();
+        WebSocketReceiveResult result;
+
+        do
+        {
+            result = await socket.ReceiveAsync(buffer, cts.Token);
+            stream.Write(buffer, 0, result.Count);
+        }
+        while (!result.EndOfMessage);
+
+        return Encoding.UTF8.GetString(stream.ToArray());
     }
 
     private static int GetFreeUdpPort()

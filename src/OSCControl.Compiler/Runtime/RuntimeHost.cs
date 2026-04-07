@@ -11,6 +11,7 @@ public sealed class RuntimeHost : IAsyncDisposable
     private readonly IRuntimeHostErrorSink _errorSink;
     private readonly IReadOnlyDictionary<string, RuntimeResolvedEndpoint> _endpoints;
     private readonly List<IRuntimeInboundAdapter> _adapters;
+    private readonly NetworkTransportDispatcher? _networkTransportDispatcher;
     private CancellationTokenSource? _lifetimeCts;
     private bool _started;
     private bool _disposed;
@@ -21,6 +22,7 @@ public sealed class RuntimeHost : IAsyncDisposable
         options ??= new RuntimeHostOptions();
         _errorSink = options.ErrorSink ?? new RecordingRuntimeHostErrorSink();
         _endpoints = RuntimeEndpointResolver.Resolve(engine.Endpoints);
+        _networkTransportDispatcher = _engine.TransportDispatcher as NetworkTransportDispatcher;
         _adapters = CreateAdapters(_endpoints.Values).ToList();
     }
 
@@ -90,8 +92,14 @@ public sealed class RuntimeHost : IAsyncDisposable
                 case "osc.udp":
                     yield return new OscUdpInboundAdapter(endpoint, HandleInboundAsync, _errorSink);
                     break;
+                case "ws.client":
+                    if (_networkTransportDispatcher is not null)
+                    {
+                        yield return new WebSocketClientInboundAdapter(endpoint, _networkTransportDispatcher, HandleInboundAsync, _errorSink);
+                    }
+                    break;
                 case "ws.server":
-                    yield return new WebSocketServerInboundAdapter(endpoint, HandleInboundAsync, _errorSink);
+                    yield return new WebSocketServerInboundAdapter(endpoint, HandleInboundAsync, _errorSink, _networkTransportDispatcher);
                     break;
             }
         }
@@ -192,11 +200,140 @@ internal sealed class OscUdpInboundAdapter : IRuntimeInboundAdapter
     }
 }
 
+internal sealed class WebSocketClientInboundAdapter : IRuntimeInboundAdapter
+{
+    private readonly RuntimeResolvedEndpoint _endpoint;
+    private readonly NetworkTransportDispatcher _dispatcher;
+    private readonly Func<string, RuntimeEventMessage, CancellationToken, Task> _onMessage;
+    private readonly IRuntimeHostErrorSink _errorSink;
+    private Task? _receiveLoop;
+    private CancellationTokenSource? _internalCts;
+
+    public WebSocketClientInboundAdapter(
+        RuntimeResolvedEndpoint endpoint,
+        NetworkTransportDispatcher dispatcher,
+        Func<string, RuntimeEventMessage, CancellationToken, Task> onMessage,
+        IRuntimeHostErrorSink errorSink)
+    {
+        _endpoint = endpoint;
+        _dispatcher = dispatcher;
+        _onMessage = onMessage;
+        _errorSink = errorSink;
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        if (_receiveLoop is not null)
+        {
+            return Task.CompletedTask;
+        }
+
+        _internalCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        _receiveLoop = RunReceiveLoopAsync(_internalCts.Token);
+        return Task.CompletedTask;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _internalCts?.Cancel();
+
+        if (_receiveLoop is not null)
+        {
+            try
+            {
+                await _receiveLoop;
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
+
+        _internalCts?.Dispose();
+    }
+
+    private async Task RunReceiveLoopAsync(CancellationToken cancellationToken)
+    {
+        var codec = RuntimeEndpointConfigReader.GetOptionalString(_endpoint, "codec") ?? "json";
+        var buffer = new byte[16 * 1024];
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            ClientWebSocket? socket = null;
+            try
+            {
+                socket = await _dispatcher.GetOrCreateWebSocketClientAsync(_endpoint, cancellationToken);
+                await ReceiveMessagesAsync(socket, codec, buffer, cancellationToken);
+                _dispatcher.RemoveWebSocketClient(_endpoint.Name, socket);
+                socket.Dispose();
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (ObjectDisposedException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                if (socket is not null)
+                {
+                    _dispatcher.RemoveWebSocketClient(_endpoint.Name, socket);
+                    socket.Dispose();
+                }
+
+                _errorSink.Report(new RuntimeHostError(_endpoint.Name, _endpoint.TransportKind, "client", ex, DateTimeOffset.UtcNow));
+                try
+                {
+                    await Task.Delay(500, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    private async Task ReceiveMessagesAsync(ClientWebSocket socket, string codec, byte[] buffer, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested && socket.State == WebSocketState.Open)
+        {
+            using var stream = new MemoryStream();
+            WebSocketReceiveResult result;
+
+            do
+            {
+                result = await socket.ReceiveAsync(buffer, cancellationToken);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                    {
+                        await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "closed", CancellationToken.None);
+                    }
+
+                    return;
+                }
+
+                stream.Write(buffer, 0, result.Count);
+            }
+            while (!result.EndOfMessage);
+
+            var message = WebSocketInboundMessageDecoder.Decode(_endpoint.Name, result.MessageType, stream.ToArray(), codec);
+            await _onMessage(_endpoint.Name, message, cancellationToken);
+        }
+    }
+}
+
 internal sealed class WebSocketServerInboundAdapter : IRuntimeInboundAdapter
 {
     private readonly RuntimeResolvedEndpoint _endpoint;
     private readonly Func<string, RuntimeEventMessage, CancellationToken, Task> _onMessage;
     private readonly IRuntimeHostErrorSink _errorSink;
+    private readonly NetworkTransportDispatcher? _dispatcher;
     private readonly ConcurrentDictionary<Guid, WebSocket> _sockets = new();
     private readonly ConcurrentBag<Task> _connectionTasks = [];
     private HttpListener? _listener;
@@ -206,11 +343,13 @@ internal sealed class WebSocketServerInboundAdapter : IRuntimeInboundAdapter
     public WebSocketServerInboundAdapter(
         RuntimeResolvedEndpoint endpoint,
         Func<string, RuntimeEventMessage, CancellationToken, Task> onMessage,
-        IRuntimeHostErrorSink errorSink)
+        IRuntimeHostErrorSink errorSink,
+        NetworkTransportDispatcher? dispatcher)
     {
         _endpoint = endpoint;
         _onMessage = onMessage;
         _errorSink = errorSink;
+        _dispatcher = dispatcher;
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
@@ -299,6 +438,7 @@ internal sealed class WebSocketServerInboundAdapter : IRuntimeInboundAdapter
                 var webSocketContext = await context.AcceptWebSocketAsync(null);
                 var socketId = Guid.NewGuid();
                 _sockets[socketId] = webSocketContext.WebSocket;
+                _dispatcher?.RegisterWebSocketServerSocket(_endpoint.Name, socketId, webSocketContext.WebSocket);
                 var task = HandleConnectionAsync(socketId, webSocketContext.WebSocket, cancellationToken);
                 _connectionTasks.Add(task);
             }
@@ -366,6 +506,7 @@ internal sealed class WebSocketServerInboundAdapter : IRuntimeInboundAdapter
         }
         finally
         {
+            _dispatcher?.UnregisterWebSocketServerSocket(_endpoint.Name, socketId);
             _sockets.TryRemove(socketId, out _);
             socket.Dispose();
         }

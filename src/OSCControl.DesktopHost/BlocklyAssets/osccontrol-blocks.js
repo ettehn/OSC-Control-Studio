@@ -9,7 +9,7 @@
       "message0": "OSC UDP endpoint %1 mode %2 host %3 port %4",
       "args0": [
         { "type": "field_input", "name": "NAME", "text": "oscIn" },
-        { "type": "field_dropdown", "name": "MODE", "options": [["input", "input"], ["output", "output"]] },
+        { "type": "field_dropdown", "name": "MODE", "options": [["input", "input"], ["output", "output"], ["duplex", "duplex"]] },
         { "type": "field_input", "name": "HOST", "text": "127.0.0.1" },
         { "type": "field_number", "name": "PORT", "value": 9000, "min": 1, "max": 65535, "precision": 1 }
       ],
@@ -24,7 +24,7 @@
       "args0": [
         { "type": "field_dropdown", "name": "TRANSPORT", "options": [["client", "ws.client"], ["server", "ws.server"]] },
         { "type": "field_input", "name": "NAME", "text": "wsOut" },
-        { "type": "field_dropdown", "name": "MODE", "options": [["input", "input"], ["output", "output"]] },
+        { "type": "field_dropdown", "name": "MODE", "options": [["input", "input"], ["output", "output"], ["duplex", "duplex"]] },
         { "type": "field_input", "name": "HOST", "text": "127.0.0.1" },
         { "type": "field_number", "name": "PORT", "value": 8080, "min": 1, "max": 65535, "precision": 1 },
         { "type": "field_input", "name": "PATH", "text": "/osc" },

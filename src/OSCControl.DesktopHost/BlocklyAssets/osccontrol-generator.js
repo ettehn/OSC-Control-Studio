@@ -54,7 +54,7 @@
 
   generator.forBlock.osc_endpoint_udp = function (block) {
     const name = identifier(block.getFieldValue('NAME'), 'oscIn');
-    const mode = block.getFieldValue('MODE') === 'output' ? 'output' : 'input';
+    const mode = endpointMode(block.getFieldValue('MODE'));
     const host = stringLiteral(block.getFieldValue('HOST') || '127.0.0.1');
     const port = portNumber(block.getFieldValue('PORT'), 9000);
     return `endpoint ${name}: osc.udp {\n    mode: ${mode}\n    host: ${host}\n    port: ${port}\n    codec: osc\n}\n\n`;
@@ -63,7 +63,7 @@
   generator.forBlock.osc_endpoint_ws = function (block) {
     const name = identifier(block.getFieldValue('NAME'), 'wsOut');
     const transport = block.getFieldValue('TRANSPORT') === 'ws.server' ? 'ws.server' : 'ws.client';
-    const mode = block.getFieldValue('MODE') === 'input' ? 'input' : 'output';
+    const mode = endpointMode(block.getFieldValue('MODE'));
     const host = stringLiteral(block.getFieldValue('HOST') || '127.0.0.1');
     const port = portNumber(block.getFieldValue('PORT'), 8080);
     const path = stringLiteral(block.getFieldValue('PATH') || '/osc');
@@ -329,6 +329,10 @@
 
   function isReadOnlyVrchatAvatarParameter(value) {
     return VRCHAT_READONLY_AVATAR_PARAMETERS.has(String(value || '').toLowerCase());
+  }
+
+  function endpointMode(value) {
+    return value === 'output' || value === 'duplex' ? value : 'input';
   }
 
   function portNumber(value, fallback) {

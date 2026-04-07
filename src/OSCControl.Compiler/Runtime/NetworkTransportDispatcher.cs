@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.WebSockets;
@@ -10,6 +11,7 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
 {
     private readonly Dictionary<string, UdpClient> _udpClients = new(StringComparer.Ordinal);
     private readonly Dictionary<string, ClientWebSocket> _webSockets = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, ConcurrentDictionary<Guid, WebSocket>> _webSocketServerSockets = new(StringComparer.Ordinal);
     private readonly SemaphoreSlim _gate = new(1, 1);
     private bool _disposed;
 
@@ -28,7 +30,8 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
                 return;
 
             case "ws.server":
-                throw new NotSupportedException("ws.server outbound dispatch is not implemented yet. Use ws.client for runtime sends in v0.1.");
+                await DispatchWebSocketServerAsync(endpoint, message, cancellationToken);
+                return;
 
             default:
                 throw new NotSupportedException($"Unsupported transport kind '{endpoint.TransportKind}'.");
@@ -69,6 +72,7 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
             }
 
             _webSockets.Clear();
+            _webSocketServerSockets.Clear();
             _udpClients.Clear();
         }
         finally
@@ -93,10 +97,34 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
 
     private async Task DispatchWebSocketClientAsync(RuntimeResolvedEndpoint endpoint, RuntimeOutboundMessage message, CancellationToken cancellationToken)
     {
-        var socket = await GetOrCreateWebSocketAsync(endpoint, cancellationToken);
+        var socket = await GetOrCreateWebSocketClientAsync(endpoint, cancellationToken);
         var codec = RuntimeEndpointConfigReader.GetOptionalString(endpoint, "codec") ?? "json";
         var payload = CreateWebSocketPayload(message, codec, out var messageType);
         await socket.SendAsync(payload, messageType, endOfMessage: true, cancellationToken);
+    }
+
+    private async Task DispatchWebSocketServerAsync(RuntimeResolvedEndpoint endpoint, RuntimeOutboundMessage message, CancellationToken cancellationToken)
+    {
+        var codec = RuntimeEndpointConfigReader.GetOptionalString(endpoint, "codec") ?? "json";
+        var payload = CreateWebSocketPayload(message, codec, out var messageType);
+        var sockets = GetOpenWebSocketServerSockets(endpoint.Name);
+
+        foreach (var socket in sockets)
+        {
+            try
+            {
+                if (socket.State == WebSocketState.Open)
+                {
+                    await socket.SendAsync(payload, messageType, endOfMessage: true, cancellationToken);
+                }
+            }
+            catch (WebSocketException)
+            {
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+        }
     }
 
     private async Task<UdpClient> GetOrCreateUdpClientAsync(RuntimeResolvedEndpoint endpoint, CancellationToken cancellationToken)
@@ -122,7 +150,7 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
         }
     }
 
-    private async Task<ClientWebSocket> GetOrCreateWebSocketAsync(RuntimeResolvedEndpoint endpoint, CancellationToken cancellationToken)
+    internal async Task<ClientWebSocket> GetOrCreateWebSocketClientAsync(RuntimeResolvedEndpoint endpoint, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
         try
@@ -147,6 +175,50 @@ public sealed class NetworkTransportDispatcher : IRuntimeTransportDispatcher, IA
         {
             _gate.Release();
         }
+    }
+
+    internal void RegisterWebSocketServerSocket(string endpointName, Guid socketId, WebSocket socket)
+    {
+        var sockets = _webSocketServerSockets.GetOrAdd(endpointName, static _ => new ConcurrentDictionary<Guid, WebSocket>());
+        sockets[socketId] = socket;
+    }
+
+    internal void UnregisterWebSocketServerSocket(string endpointName, Guid socketId)
+    {
+        if (_webSocketServerSockets.TryGetValue(endpointName, out var sockets))
+        {
+            sockets.TryRemove(socketId, out _);
+            if (sockets.IsEmpty)
+            {
+                _webSocketServerSockets.TryRemove(endpointName, out _);
+            }
+        }
+    }
+
+    internal void RemoveWebSocketClient(string endpointName, ClientWebSocket socket)
+    {
+        _gate.Wait();
+        try
+        {
+            if (_webSockets.TryGetValue(endpointName, out var existing) && ReferenceEquals(existing, socket))
+            {
+                _webSockets.Remove(endpointName);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private IReadOnlyList<WebSocket> GetOpenWebSocketServerSockets(string endpointName)
+    {
+        if (!_webSocketServerSockets.TryGetValue(endpointName, out var sockets))
+        {
+            return [];
+        }
+
+        return sockets.Values.Where(static socket => socket.State == WebSocketState.Open).ToArray();
     }
 
     private static IReadOnlyList<object?> SelectOscArguments(RuntimeOutboundMessage message)
