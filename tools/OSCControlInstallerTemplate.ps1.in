@@ -1,0 +1,187 @@
+param(
+    [string] $InstallRoot,
+    [switch] $NoShortcut,
+    [switch] $Launch,
+    [switch] $Force
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$AppName = 'APP_NAME_PLACEHOLDER'
+$FolderName = 'FOLDER_NAME_PLACEHOLDER'
+$GeneratedAt = 'GENERATED_AT_PLACEHOLDER'
+$PayloadBase64 = @(
+PAYLOAD_LINES_PLACEHOLDER
+) -join ''
+
+function Test-PathInsideOrEqual {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $Root
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    $fullRoot = [System.IO.Path]::GetFullPath($Root).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    return $fullPath.Equals($fullRoot, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $fullPath.StartsWith($fullRoot + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase) -or
+        $fullPath.StartsWith($fullRoot + [System.IO.Path]::AltDirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Remove-ChildIfExists {
+    param(
+        [Parameter(Mandatory = $true)][string] $Path,
+        [Parameter(Mandatory = $true)][string] $Root
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    if (-not (Test-PathInsideOrEqual -Path $Path -Root $Root)) {
+        throw "Refusing to remove path outside install root: $Path"
+    }
+
+    Remove-Item -LiteralPath $Path -Recurse -Force
+}
+
+function New-StartMenuShortcut {
+    param(
+        [Parameter(Mandatory = $true)][string] $TargetRoot,
+        [Parameter(Mandatory = $true)][string] $ShortcutName
+    )
+
+    $programsRoot = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs'
+    $shortcutDirectory = Join-Path $programsRoot 'OSCControl'
+    New-Item -ItemType Directory -Force -Path $shortcutDirectory | Out-Null
+
+    $shortcutPath = Join-Path $shortcutDirectory ($ShortcutName + '.lnk')
+    $runCommand = Join-Path $TargetRoot 'run.cmd'
+    $iconPath = Join-Path $TargetRoot 'host\OSCControl.AppHost.exe'
+
+    $shell = New-Object -ComObject WScript.Shell
+    $shortcut = $shell.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $runCommand
+    $shortcut.WorkingDirectory = $TargetRoot
+    $shortcut.Description = $ShortcutName
+    if (Test-Path -LiteralPath $iconPath) {
+        $shortcut.IconLocation = $iconPath
+    }
+    $shortcut.Save()
+
+    return $shortcutPath
+}
+
+function Write-Uninstaller {
+    param(
+        [Parameter(Mandatory = $true)][string] $TargetRoot,
+        [Parameter(Mandatory = $true)][string] $ShortcutName
+    )
+
+    $uninstallerPath = Join-Path $TargetRoot 'Uninstall.ps1'
+    $uninstallerLines = @(
+        'param([switch] $RemoveData)',
+        '',
+        'Set-StrictMode -Version Latest',
+        '$ErrorActionPreference = ''Stop''',
+        '',
+        '$installRoot = Split-Path -Parent $MyInvocation.MyCommand.Path',
+        ('$shortcutPath = Join-Path $env:APPDATA ''Microsoft\Windows\Start Menu\Programs\OSCControl\' + $ShortcutName.Replace("'", "''") + '.lnk'''),
+        '',
+        'if (Test-Path -LiteralPath $shortcutPath) {',
+        '    Remove-Item -LiteralPath $shortcutPath -Force',
+        '}',
+        '',
+        'foreach ($name in @(''app'', ''host'', ''run.cmd'', ''.installation.json'', ''Uninstall.ps1'')) {',
+        '    $path = Join-Path $installRoot $name',
+        '    if (Test-Path -LiteralPath $path) {',
+        '        Remove-Item -LiteralPath $path -Recurse -Force',
+        '    }',
+        '}',
+        '',
+        'if ($RemoveData) {',
+        '    foreach ($name in @(''data'', ''logs'')) {',
+        '        $path = Join-Path $installRoot $name',
+        '        if (Test-Path -LiteralPath $path) {',
+        '            Remove-Item -LiteralPath $path -Recurse -Force',
+        '        }',
+        '    }',
+        '',
+        '    $remaining = Get-ChildItem -LiteralPath $installRoot -Force -ErrorAction SilentlyContinue',
+        '    if (-not $remaining) {',
+        '        Remove-Item -LiteralPath $installRoot -Force',
+        '    }',
+        '}',
+        '',
+        ('Write-Host ''Uninstalled ' + $ShortcutName.Replace("'", "''") + '.''')
+    )
+
+    Set-Content -LiteralPath $uninstallerPath -Value ([string]::Join([Environment]::NewLine, $uninstallerLines)) -Encoding UTF8
+    return $uninstallerPath
+}
+
+if ([string]::IsNullOrWhiteSpace($InstallRoot)) {
+    $InstallRoot = Join-Path $env:LOCALAPPDATA 'Programs'
+}
+
+$installRootFull = [System.IO.Path]::GetFullPath($InstallRoot)
+$targetRoot = Join-Path $installRootFull $FolderName
+$targetRootFull = [System.IO.Path]::GetFullPath($targetRoot)
+
+if (-not (Test-PathInsideOrEqual -Path $targetRootFull -Root $installRootFull)) {
+    throw "Install target escapes install root: $targetRootFull"
+}
+
+$tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("OSCControlInstall-" + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+
+try {
+    $zipPath = Join-Path $tempRoot 'payload.zip'
+    $payloadDirectory = Join-Path $tempRoot 'payload'
+    [System.IO.File]::WriteAllBytes($zipPath, [Convert]::FromBase64String(($PayloadBase64 -replace '\s', '')))
+    Expand-Archive -LiteralPath $zipPath -DestinationPath $payloadDirectory -Force
+
+    New-Item -ItemType Directory -Force -Path $targetRootFull | Out-Null
+    Remove-ChildIfExists -Path (Join-Path $targetRootFull 'app') -Root $targetRootFull
+    Remove-ChildIfExists -Path (Join-Path $targetRootFull 'host') -Root $targetRootFull
+    Remove-ChildIfExists -Path (Join-Path $targetRootFull 'run.cmd') -Root $targetRootFull
+
+    foreach ($child in Get-ChildItem -LiteralPath $payloadDirectory -Force) {
+        $targetChild = Join-Path $targetRootFull $child.Name
+        if (($child.Name -eq 'data' -or $child.Name -eq 'logs') -and (Test-Path -LiteralPath $targetChild)) {
+            continue
+        }
+
+        Copy-Item -LiteralPath $child.FullName -Destination $targetRootFull -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path (Join-Path $targetRootFull 'data') | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $targetRootFull 'logs') | Out-Null
+
+    $metadata = [ordered]@{
+        appName = $AppName
+        installedAt = [DateTimeOffset]::Now.ToString('O')
+        installerGeneratedAt = $GeneratedAt
+        installRoot = $targetRootFull
+    }
+    $metadata | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $targetRootFull '.installation.json') -Encoding UTF8
+
+    $uninstallerPath = Write-Uninstaller -TargetRoot $targetRootFull -ShortcutName $AppName
+    $shortcutPath = $null
+    if (-not $NoShortcut) {
+        $shortcutPath = New-StartMenuShortcut -TargetRoot $targetRootFull -ShortcutName $AppName
+    }
+
+    Write-Host "Installed $AppName to $targetRootFull"
+    Write-Host "Uninstaller: $uninstallerPath"
+    if ($shortcutPath) {
+        Write-Host "Start menu shortcut: $shortcutPath"
+    }
+
+    if ($Launch) {
+        Start-Process -FilePath (Join-Path $targetRootFull 'run.cmd') -WorkingDirectory $targetRootFull
+    }
+} finally {
+    if (Test-Path -LiteralPath $tempRoot) {
+        Remove-Item -LiteralPath $tempRoot -Recurse -Force
+    }
+}

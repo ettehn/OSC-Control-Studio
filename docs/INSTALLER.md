@@ -1,0 +1,68 @@
+# OSCControl installer
+
+This project uses a repo-local PowerShell installer generator for packaged
+OSCControl apps. It does not require WiX, Inno Setup, or machine-wide install
+permissions.
+
+## Input package
+
+Build or export an app package first. The package directory must contain:
+
+```text
+AppName/
+  app/
+  host/
+  data/
+  logs/
+  run.cmd
+```
+
+This is the same directory shape produced by the desktop `Package App` flow and
+`OSCControl.Packager`.
+
+## Build an installer
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\CodexProjects\tools\Build-OSCControlInstaller.ps1 `
+  -PackageRoot C:\Path\To\AppName `
+  -OutputPath C:\Path\To\Install-AppName.ps1 `
+  -Force
+```
+
+The output is a single PowerShell installer script with the packaged app embedded
+as a compressed payload.
+
+## Install
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Path\To\Install-AppName.ps1
+```
+
+By default, the app is installed for the current user under:
+
+```text
+%LOCALAPPDATA%\Programs\<AppName>
+```
+
+Options:
+
+```powershell
+-InstallRoot C:\Custom\Programs
+-NoShortcut
+-Launch
+```
+
+The installer updates `app`, `host`, and `run.cmd` while preserving `data` and
+`logs`.
+
+## Uninstall
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\Programs\<AppName>\Uninstall.ps1"
+```
+
+Add `-RemoveData` to also delete `data` and `logs`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\Programs\<AppName>\Uninstall.ps1" -RemoveData
+```
