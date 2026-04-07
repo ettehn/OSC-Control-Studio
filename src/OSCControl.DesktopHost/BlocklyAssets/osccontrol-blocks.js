@@ -62,6 +62,19 @@
       "helpUrl": ""
     },
     {
+      "type": "osc_variable_expr",
+      "message0": "declare variable %1 = %2",
+      "args0": [
+        { "type": "field_input", "name": "NAME", "text": "count" },
+        { "type": "input_value", "name": "VALUE" }
+      ],
+      "previousStatement": null,
+      "nextStatement": null,
+      "colour": 300,
+      "tooltip": "Declare a top-level state variable from an expression.",
+      "helpUrl": ""
+    },
+    {
       "type": "osc_startup_rule",
       "message0": "when app starts %1 %2",
       "args0": [
@@ -134,7 +147,7 @@
     },
     {
       "type": "osc_log",
-      "message0": "log %1 %2",
+      "message0": "log text %1 %2",
       "args0": [
         { "type": "field_dropdown", "name": "LEVEL", "options": [["info", "info"], ["warn", "warn"], ["error", "error"]] },
         { "type": "field_input", "name": "VALUE", "text": "ready" }
@@ -451,7 +464,7 @@
     },
     {
       "type": "osc_log_expr",
-      "message0": "log %1 value %2",
+      "message0": "log %1 %2",
       "args0": [
         { "type": "field_dropdown", "name": "LEVEL", "options": [["info", "info"], ["warn", "warn"], ["error", "error"]] },
         { "type": "input_value", "name": "VALUE" }

@@ -44,7 +44,9 @@
       <block type="vrchat_endpoint"></block>
     </category>
     <category name="Variables" colour="#9333ea">
-      <block type="osc_variable"></block>
+      <block type="osc_variable_expr">
+        <value name="VALUE"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
+      </block>
       <block type="osc_expr_variable"></block>
       <block type="osc_store"></block>
       <block type="osc_store_expr">
@@ -70,10 +72,10 @@
         <value name="RIGHT"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
       </block>
       <block type="osc_expr_unary">
-        <value name="VALUE"><shadow type="osc_expr_boolean"></shadow></value>
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
       </block>
       <block type="osc_expr_call1">
-        <value name="ARG"><shadow type="osc_expr_arg"></shadow></value>
+        <value name="ARG"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
       </block>
       <block type="osc_expr_raw"></block>
     </category>
@@ -85,10 +87,10 @@
       <block type="vrchat_param_rule"></block>
     </category>
     <category name="Actions" colour="#d97706">
-      <block type="osc_log"></block>
       <block type="osc_log_expr">
-        <value name="VALUE"><shadow type="osc_expr_arg"></shadow></value>
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
       </block>
+      <block type="osc_log"></block>
       <block type="osc_send_simple"></block>
       <block type="osc_send_body"></block>
     </category>
@@ -131,15 +133,15 @@
       <block type="vrchat_chat"></block>
       <block type="vrchat_input"></block>
       <block type="vrchat_input_expr">
-        <value name="VALUE"><shadow type="osc_expr_arg"></shadow></value>
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
       </block>
       <block type="vrchat_param"></block>
       <block type="vrchat_param_expr">
-        <value name="VALUE"><shadow type="osc_expr_number"><field name="VALUE">0</field></shadow></value>
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
       </block>
       <block type="vrchat_typing"></block>
       <block type="vrchat_typing_expr">
-        <value name="VALUE"><shadow type="osc_expr_boolean"></shadow></value>
+        <value name="VALUE"><shadow type="osc_expr_variable"><field name="NAME">count</field></shadow></value>
       </block>
     </category>
     <category name="Raw" colour="#6b7280">

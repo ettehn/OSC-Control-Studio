@@ -52,6 +52,12 @@
     return `var ${name} = ${value}\n\n`;
   };
 
+  generator.forBlock.osc_variable_expr = function (block) {
+    const name = identifier(block.getFieldValue('NAME'), 'count');
+    const value = generator.valueToCode(block, 'VALUE', generator.ORDER_NONE) || '0';
+    return `var ${name} = ${value}\n\n`;
+  };
+
   generator.forBlock.osc_startup_rule = function (block) {
     const body = generator.statementToCode(block, 'STACK') || '    log info "ready"\n';
     return `on startup [\n${body}]\n\n`;
