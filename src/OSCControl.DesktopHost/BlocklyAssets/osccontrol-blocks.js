@@ -55,6 +55,7 @@
         { "type": "field_input", "name": "NAME", "text": "count" },
         { "type": "field_input", "name": "VALUE", "text": "0" }
       ],
+      "previousStatement": null,
       "nextStatement": null,
       "colour": 300,
       "tooltip": "Declare a top-level state variable.",
