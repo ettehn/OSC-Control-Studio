@@ -61,6 +61,8 @@ internal sealed class BlocklyWebViewHost : UserControl
     private readonly WebView2 _webView = new() { Dock = DockStyle.Fill };
     private readonly string _indexPath;
     private bool _initializationStarted;
+    private bool _pageReady;
+    private string _pendingWorkspaceJson = string.Empty;
     private string _userDataFolder = string.Empty;
     private static readonly object EnvironmentSetupSync = new();
     private static Task<WebView2EnvironmentSetup>? s_environmentSetupTask;
@@ -74,6 +76,17 @@ internal sealed class BlocklyWebViewHost : UserControl
     }
 
     public event EventHandler<BlocklyGeneratedScript>? GeneratedScriptReceived;
+
+    public Task LoadWorkspaceJsonAsync(string workspaceJson)
+    {
+        if (string.IsNullOrWhiteSpace(workspaceJson))
+        {
+            return Task.CompletedTask;
+        }
+
+        _pendingWorkspaceJson = workspaceJson;
+        return TryPostPendingWorkspaceAsync();
+    }
 
     protected override void OnHandleCreated(EventArgs e)
     {
@@ -134,7 +147,11 @@ internal sealed class BlocklyWebViewHost : UserControl
             Program.Log($"Blockly WebView2 handles: host=0x{Handle.ToInt64():X}; webView=0x{_webView.Handle.ToInt64():X}; size={_webView.Width}x{_webView.Height}; visible={Visible}/{_webView.Visible}");
             await _webView.EnsureCoreWebView2Async(setup.Environment);
             Program.Log($"Blockly WebView2 controller ready in {stopwatch.ElapsedMilliseconds} ms.");
-            _webView.CoreWebView2.NavigationStarting += (_, args) => Program.Log($"Blockly WebView2 navigation starting: {args.Uri}");
+            _webView.CoreWebView2.NavigationStarting += (_, args) =>
+            {
+                _pageReady = false;
+                Program.Log($"Blockly WebView2 navigation starting: {args.Uri}");
+            };
             _webView.CoreWebView2.NavigationCompleted += (_, args) => Program.Log($"Blockly WebView2 navigation completed: success={args.IsSuccess}; status={args.WebErrorStatus}");
             _webView.CoreWebView2.DOMContentLoaded += (_, _) => Program.Log("Blockly WebView2 DOM content loaded.");
             _webView.CoreWebView2.ProcessFailed += (_, args) => Program.Log($"Blockly WebView2 process failed: {args.ProcessFailedKind}");
@@ -161,6 +178,14 @@ internal sealed class BlocklyWebViewHost : UserControl
             }
 
             var kindText = kind.GetString();
+            if (kindText == "osccontrol-blockly-ready")
+            {
+                _pageReady = true;
+                Program.Log("Blockly WebView2 page ready.");
+                _ = TryPostPendingWorkspaceAsync();
+                return;
+            }
+
             if (kindText == "osccontrol-blockly-diagnostic")
             {
                 var level = root.TryGetProperty("level", out var levelElement) ? levelElement.GetString() ?? string.Empty : string.Empty;
@@ -189,6 +214,26 @@ internal sealed class BlocklyWebViewHost : UserControl
         {
             Program.Log($"Blockly WebView2 message parse failed: {ex.Message}");
         }
+    }
+
+    private async Task TryPostPendingWorkspaceAsync()
+    {
+        if (!_pageReady || string.IsNullOrWhiteSpace(_pendingWorkspaceJson) || _webView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        var workspaceJson = _pendingWorkspaceJson;
+        _pendingWorkspaceJson = string.Empty;
+        var payload = JsonSerializer.Serialize(new
+        {
+            kind = "osccontrol-blockly-load-workspace",
+            workspaceJson
+        });
+
+        _webView.CoreWebView2.PostWebMessageAsJson(payload);
+        Program.Log($"Blockly WebView2 workspace restore posted: chars={workspaceJson.Length}");
+        await Task.CompletedTask;
     }
 
     private static Task<WebView2EnvironmentSetup> StartEnvironmentWarmup()

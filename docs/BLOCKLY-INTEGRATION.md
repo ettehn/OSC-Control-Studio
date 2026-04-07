@@ -87,8 +87,9 @@ Avoid custom functions and full expression round-tripping in the first milestone
 
 ### Milestone 4: Persistence
 
-- decide whether `.osccontrol` remains the only saved artifact or whether a sidecar workspace file is needed.
-- if using a sidecar, prefer `<script>.blocks.json` so generated script remains readable and editable without Blockly.
+- keep `.osccontrol` as the readable generated script artifact.
+- store Blockly workspace metadata in `<script>.osccontrol.blocks.json` as an optional sidecar.
+- restore the Blockly workspace from the sidecar when opening or reloading the matching script.
 
 ## Stop Conditions
 
@@ -109,6 +110,8 @@ The current Blockly page is no longer only a blank prototype. It includes these 
 - `VRChat param to input`: declare `vrchat.endpoint`, then map a VRChat avatar parameter event to a VRChat input.
 
 When the WebView2 host is enabled, Blockly changes debounce and auto-sync generated `.osccontrol` text back to the desktop host. While the `Blocks` tab is selected, desktop `Check`, `Save`, `Package App...`, and `Start` use the latest generated Blockly script.
+
+Saving from the `Blocks` tab also writes a `<script>.osccontrol.blocks.json` sidecar file. Opening or reloading the matching `.osccontrol` file restores that sidecar into the Blockly workspace when it exists.
 
 ## WebView2 Build Switch
 

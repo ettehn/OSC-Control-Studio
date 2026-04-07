@@ -229,7 +229,8 @@
     workspace: null,
     source: '',
     postTimer: 0,
-    suppressEvents: false
+    suppressEvents: false,
+    pendingWorkspaceJson: ''
   };
 
   window.addEventListener('load', () => {
@@ -248,6 +249,9 @@
     setStatus('Initializing Blockly...');
     postButton.addEventListener('click', () => postToHost('manual'));
     loadTemplateButton.addEventListener('click', loadSelectedTemplate);
+    if (hasWebViewHost()) {
+      window.chrome.webview.addEventListener('message', handleHostMessage);
+    }
 
     if (!window.Blockly || !window.OSCControlBlocklyGenerator) {
       status.textContent = 'Blockly vendor files are missing. Add them under BlocklyAssets/vendor/blockly/.';
@@ -275,7 +279,9 @@
 
     setStatus('Loading starter scenario...');
     loadTemplate('startup-log');
+    restorePendingWorkspace();
     setStatus(hasWebViewHost() ? 'Ready and synced to desktop' : 'Ready without WebView2 host');
+    postReadyToHost();
     reportDiagnostic('info', `Blockly editor initialized in ${Math.round(performance.now() - startupTime)} ms`);
   }
 
@@ -315,6 +321,63 @@
     }
 
     return String(error);
+  }
+
+  function handleHostMessage(event) {
+    const message = event.data || {};
+    if (message.kind !== 'osccontrol-blockly-load-workspace') {
+      return;
+    }
+
+    state.pendingWorkspaceJson = message.workspaceJson || '';
+    restorePendingWorkspace();
+  }
+
+  function postReadyToHost() {
+    if (!hasWebViewHost()) {
+      return;
+    }
+
+    window.chrome.webview.postMessage({
+      kind: 'osccontrol-blockly-ready'
+    });
+  }
+
+  function restorePendingWorkspace() {
+    if (!state.pendingWorkspaceJson || !state.workspace) {
+      return;
+    }
+
+    const workspaceJson = state.pendingWorkspaceJson;
+    state.pendingWorkspaceJson = '';
+    loadWorkspaceJson(workspaceJson);
+  }
+
+  function loadWorkspaceJson(workspaceJson) {
+    if (!workspaceJson || !Blockly.serialization || !Blockly.serialization.workspaces) {
+      return;
+    }
+
+    try {
+      const data = JSON.parse(workspaceJson);
+      state.suppressEvents = true;
+      try {
+        state.workspace.clear();
+        Blockly.serialization.workspaces.load(data, state.workspace);
+        if (typeof state.workspace.cleanUp === 'function') {
+          state.workspace.cleanUp();
+        }
+      } finally {
+        state.suppressEvents = false;
+      }
+
+      updatePreview();
+      postToHost('restore');
+      setStatus('Restored Blockly workspace');
+    } catch (error) {
+      state.suppressEvents = false;
+      reportDiagnostic('restore', 'Failed to restore Blockly workspace', error);
+    }
   }
   function loadSelectedTemplate() {
     const select = document.getElementById('templateSelect');

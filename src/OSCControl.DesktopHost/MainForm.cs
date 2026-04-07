@@ -22,6 +22,7 @@ internal sealed class MainForm : Form
 #if OSCCONTROL_BLOCKLY_WEBVIEW2
     private string _blocklyGeneratedSource = "on startup [\r\n    log info \"ready\"\r\n]\r\n";
     private string _blocklyWorkspaceJson = string.Empty;
+    private BlocklyWebViewHost? _blocklyWebViewHost;
 #endif
     private readonly ListView _diagnosticsView;
     private readonly RichTextBox _runtimeOutputTextBox;
@@ -314,6 +315,7 @@ internal sealed class MainForm : Form
         root.Controls.Add(noteLabel, 0, 0);
 
         var host = new BlocklyWebViewHost(BlocklyEditorAssets.GetIndexPath());
+        _blocklyWebViewHost = host;
         host.GeneratedScriptReceived += (_, script) =>
         {
             _blocklyGeneratedSource = string.IsNullOrWhiteSpace(script.Source) ? _blocklyGeneratedSource : script.Source;
@@ -691,8 +693,17 @@ internal sealed class MainForm : Form
 
         _pathTextBox.Text = dialog.FileName;
         _editorTextBox.Text = await File.ReadAllTextAsync(dialog.FileName);
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+        _blocklyGeneratedSource = _editorTextBox.Text;
+        var restoredBlocks = await LoadBlocklyWorkspaceForScriptAsync(dialog.FileName);
+        _editorTabs.SelectedTab = restoredBlocks ? _blocksTab : _scriptTab;
+        UpdateStatus(restoredBlocks
+            ? L("Loaded script and restored Blockly workspace.", "Loaded script and restored Blockly workspace.")
+            : L("Loaded script into Script tab. No Blockly workspace sidecar was found.", "Loaded script into Script tab. No Blockly workspace sidecar was found."));
+#else
         _editorTabs.SelectedTab = _scriptTab;
         UpdateStatus(L("Loaded script into Script tab. Blocks draft was left unchanged.", "Loaded script into Script tab. Blocks draft was left unchanged."));
+#endif
         await CheckAsync();
     }
 
@@ -706,8 +717,17 @@ internal sealed class MainForm : Form
         }
 
         _editorTextBox.Text = await File.ReadAllTextAsync(path);
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+        _blocklyGeneratedSource = _editorTextBox.Text;
+        var restoredBlocks = await LoadBlocklyWorkspaceForScriptAsync(path);
+        _editorTabs.SelectedTab = restoredBlocks ? _blocksTab : _scriptTab;
+        UpdateStatus(restoredBlocks
+            ? L("Reloaded script and restored Blockly workspace.", "Reloaded script and restored Blockly workspace.")
+            : L("Reloaded script into Script tab. No Blockly workspace sidecar was found.", "Reloaded script into Script tab. No Blockly workspace sidecar was found."));
+#else
         _editorTabs.SelectedTab = _scriptTab;
         UpdateStatus(L("Reloaded script into Script tab. Blocks draft was left unchanged.", "Reloaded script into Script tab. Blocks draft was left unchanged."));
+#endif
         await CheckAsync();
     }
 
@@ -731,6 +751,9 @@ internal sealed class MainForm : Form
         if (_editorTabs.SelectedTab == _blocksTab)
         {
             _editorTextBox.Text = source;
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+            await SaveBlocklyWorkspaceForScriptAsync(path);
+#endif
         }
 
         UpdateStatus(L("Saved", "Saved"));
@@ -1871,6 +1894,36 @@ internal sealed class MainForm : Form
     }
 
 #if OSCCONTROL_BLOCKLY_WEBVIEW2
+    private static string GetBlocklyWorkspacePath(string scriptPath) => scriptPath + ".blocks.json";
+
+    private async Task<bool> LoadBlocklyWorkspaceForScriptAsync(string scriptPath)
+    {
+        _blocklyWorkspaceJson = string.Empty;
+        var workspacePath = GetBlocklyWorkspacePath(scriptPath);
+        if (!File.Exists(workspacePath))
+        {
+            return false;
+        }
+
+        _blocklyWorkspaceJson = await File.ReadAllTextAsync(workspacePath);
+        if (_blocklyWebViewHost is not null)
+        {
+            await _blocklyWebViewHost.LoadWorkspaceJsonAsync(_blocklyWorkspaceJson);
+        }
+
+        return !string.IsNullOrWhiteSpace(_blocklyWorkspaceJson);
+    }
+
+    private async Task SaveBlocklyWorkspaceForScriptAsync(string scriptPath)
+    {
+        if (string.IsNullOrWhiteSpace(_blocklyWorkspaceJson))
+        {
+            return;
+        }
+
+        await File.WriteAllTextAsync(GetBlocklyWorkspacePath(scriptPath), _blocklyWorkspaceJson);
+    }
+
     private string GetCurrentSource() => _editorTabs.SelectedTab == _blocksTab ? _blocklyGeneratedSource : _editorTextBox.Text;
 #else
     private string GetCurrentSource() => _editorTabs.SelectedTab == _blocksTab ? _blocksPreviewTextBox.Text : _editorTextBox.Text;
