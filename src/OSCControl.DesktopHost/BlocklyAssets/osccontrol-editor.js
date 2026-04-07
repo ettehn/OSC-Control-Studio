@@ -180,9 +180,19 @@
   };
 
   window.addEventListener('load', () => {
+    try {
+      initializeEditor();
+    } catch (error) {
+      reportDiagnostic('startup', 'Blockly editor initialization failed', error);
+    }
+  });
+
+  function initializeEditor() {
+    const startupTime = performance.now();
     const status = document.getElementById('status');
     const postButton = document.getElementById('postButton');
     const loadTemplateButton = document.getElementById('loadTemplateButton');
+    setStatus('Initializing Blockly...');
     postButton.addEventListener('click', () => postToHost('manual'));
     loadTemplateButton.addEventListener('click', loadSelectedTemplate);
 
@@ -192,6 +202,7 @@
       return;
     }
 
+    setStatus('Injecting Blockly workspace...');
     state.workspace = Blockly.inject('blocklyDiv', {
       toolbox: document.getElementById('toolbox'),
       trashcan: true,
@@ -209,10 +220,49 @@
       schedulePostToHost();
     });
 
+    setStatus('Loading starter scenario...');
     loadTemplate('startup-log');
-    status.textContent = hasWebViewHost() ? 'Ready and synced to desktop' : 'Ready without WebView2 host';
-  });
+    setStatus(hasWebViewHost() ? 'Ready and synced to desktop' : 'Ready without WebView2 host');
+    reportDiagnostic('info', `Blockly editor initialized in ${Math.round(performance.now() - startupTime)} ms`);
+  }
 
+  function setStatus(message) {
+    const status = document.getElementById('status');
+    if (status) {
+      status.textContent = message;
+    }
+  }
+
+  function reportDiagnostic(level, message, error) {
+    const detail = error ? `${message}: ${formatError(error)}` : message;
+    if (level !== 'info') {
+      setStatus(detail);
+    }
+
+    if (hasWebViewHost()) {
+      window.chrome.webview.postMessage({
+        kind: 'osccontrol-blockly-diagnostic',
+        level,
+        message: detail
+      });
+    }
+  }
+
+  function formatError(error) {
+    if (!error) {
+      return 'unknown error';
+    }
+
+    if (error.stack) {
+      return error.stack;
+    }
+
+    if (error.message) {
+      return error.message;
+    }
+
+    return String(error);
+  }
   function loadSelectedTemplate() {
     const select = document.getElementById('templateSelect');
     loadTemplate(select.value);
@@ -222,6 +272,10 @@
     const xmlText = templates[name] || templates['startup-log'];
     const parser = new DOMParser();
     const parsed = parser.parseFromString(xmlText, 'text/xml');
+    const parseError = parsed.querySelector('parsererror');
+    if (parseError) {
+      throw new Error(parseError.textContent || `Template XML parse failed: ${name}`);
+    }
     const xml = parsed.documentElement;
 
     state.suppressEvents = true;
@@ -240,8 +294,14 @@
   }
 
   function updatePreview() {
-    state.source = window.OSCControlBlocklyGenerator.workspaceToCode(state.workspace);
-    document.getElementById('scriptPreview').textContent = state.source;
+    try {
+      state.source = window.OSCControlBlocklyGenerator.workspaceToCode(state.workspace);
+      document.getElementById('scriptPreview').textContent = state.source;
+    } catch (error) {
+      reportDiagnostic('generator', 'Failed to generate OSCControl script', error);
+      state.source = '';
+      document.getElementById('scriptPreview').textContent = '';
+    }
   }
 
   function schedulePostToHost() {

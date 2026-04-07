@@ -1,4 +1,5 @@
 #if OSCCONTROL_BLOCKLY_WEBVIEW2
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -61,12 +62,15 @@ internal sealed class BlocklyWebViewHost : UserControl
     private readonly string _indexPath;
     private bool _initializationStarted;
     private string _userDataFolder = string.Empty;
+    private static readonly object EnvironmentSetupSync = new();
+    private static Task<WebView2EnvironmentSetup>? s_environmentSetupTask;
 
     public BlocklyWebViewHost(string indexPath)
     {
         _indexPath = indexPath;
         Dock = DockStyle.Fill;
         Controls.Add(_webView);
+        _ = StartEnvironmentWarmup();
     }
 
     public event EventHandler<BlocklyGeneratedScript>? GeneratedScriptReceived;
@@ -122,13 +126,14 @@ internal sealed class BlocklyWebViewHost : UserControl
 
         try
         {
-            _userDataFolder = ResolveWritableUserDataFolder();
+            var stopwatch = Stopwatch.StartNew();
+            var setup = await StartEnvironmentWarmup();
+            _userDataFolder = setup.UserDataFolder;
             Program.Log($"Blockly WebView2 user data folder: {_userDataFolder}");
             Program.Log($"Blockly WebView2 loading index: {_indexPath}");
             Program.Log($"Blockly WebView2 handles: host=0x{Handle.ToInt64():X}; webView=0x{_webView.Handle.ToInt64():X}; size={_webView.Width}x{_webView.Height}; visible={Visible}/{_webView.Visible}");
-            var environmentOptions = CreateEnvironmentOptions();
-            var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: _userDataFolder, options: environmentOptions);
-            await _webView.EnsureCoreWebView2Async(environment);
+            await _webView.EnsureCoreWebView2Async(setup.Environment);
+            Program.Log($"Blockly WebView2 controller ready in {stopwatch.ElapsedMilliseconds} ms.");
             _webView.CoreWebView2.NavigationStarting += (_, args) => Program.Log($"Blockly WebView2 navigation starting: {args.Uri}");
             _webView.CoreWebView2.NavigationCompleted += (_, args) => Program.Log($"Blockly WebView2 navigation completed: success={args.IsSuccess}; status={args.WebErrorStatus}");
             _webView.CoreWebView2.DOMContentLoaded += (_, _) => Program.Log("Blockly WebView2 DOM content loaded.");
@@ -186,6 +191,29 @@ internal sealed class BlocklyWebViewHost : UserControl
         }
     }
 
+    private static Task<WebView2EnvironmentSetup> StartEnvironmentWarmup()
+    {
+        lock (EnvironmentSetupSync)
+        {
+            if (s_environmentSetupTask is null || s_environmentSetupTask.IsCanceled || s_environmentSetupTask.IsFaulted)
+            {
+                s_environmentSetupTask = CreateEnvironmentSetupAsync();
+            }
+
+            return s_environmentSetupTask;
+        }
+    }
+
+    private static async Task<WebView2EnvironmentSetup> CreateEnvironmentSetupAsync()
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var userDataFolder = ResolveWritableUserDataFolder();
+        Program.Log($"Blockly WebView2 environment warmup starting: {userDataFolder}");
+        var environmentOptions = CreateEnvironmentOptions();
+        var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: userDataFolder, options: environmentOptions);
+        Program.Log($"Blockly WebView2 environment warmup completed in {stopwatch.ElapsedMilliseconds} ms.");
+        return new WebView2EnvironmentSetup(userDataFolder, environment);
+    }
 
     private static CoreWebView2EnvironmentOptions CreateEnvironmentOptions()
     {
@@ -259,5 +287,7 @@ internal sealed class BlocklyWebViewHost : UserControl
             TextAlign = ContentAlignment.MiddleCenter
         };
     }
+
+    private sealed record WebView2EnvironmentSetup(string UserDataFolder, CoreWebView2Environment Environment);
 }
 #endif
