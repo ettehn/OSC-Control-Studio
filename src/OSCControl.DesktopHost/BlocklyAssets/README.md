@@ -23,7 +23,7 @@ Open `index.html` in a browser to test the static prototype, or host it through 
 The desktop host can compile the WebView2-backed editor path with:
 
 ```powershell
-dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj /p:EnableBlocklyWebView2=true
+dotnet build C:\CodexProjects\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj
 ```
 
 That build writes to a separate output folder so the classic WinForms Blocks build and the Blockly/WebView2 build do not overwrite each other:
@@ -32,7 +32,7 @@ That build writes to a separate output folder so the classic WinForms Blocks bui
 C:\CodexProjects\src\OSCControl.DesktopHost\bin\Debug\net8.0-windows7.0-blockly\
 ```
 
-This requires the `Microsoft.Web.WebView2` NuGet package to be restorable in the local environment.
+The default DesktopHost build now enables the WebView2 Blockly editor, so the `Microsoft.Web.WebView2` NuGet package must be restorable in the local environment.
 
 To refresh Blockly vendor files:
 

@@ -1,6 +1,9 @@
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Net.WebSockets;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace OSCControl.Compiler.Runtime;
 
@@ -82,12 +85,9 @@ public sealed class DglabSocketSession : IAsyncDisposable
         }
     }
 
-    public async Task SendCommandAsync(string command, CancellationToken cancellationToken)
+    public async Task SendCommandAsync(string command, CancellationToken cancellationToken, bool allowUnsafeRaw = false)
     {
-        if (string.IsNullOrWhiteSpace(command))
-        {
-            throw new InvalidOperationException($"DG-LAB send on endpoint '{_endpoint.Name}' requires a non-empty command message.");
-        }
+        command = DglabSocketMessage.ValidateOutgoingCommand(_endpoint.Name, command, allowUnsafeRaw);
 
         await StartAsync(cancellationToken);
 
@@ -412,22 +412,74 @@ internal static class DglabSocketMessage
     {
         if (message.Body is string bodyText)
         {
-            return bodyText;
+            return ValidateOutgoingCommand(message.TargetEndpoint, bodyText);
         }
 
         if (message.Body is IReadOnlyDictionary<string, object?> bodyMap &&
             bodyMap.TryGetValue("message", out var bodyMessage) &&
             bodyMessage is not null)
         {
-            return RuntimeValueHelpers.ToStringValue(bodyMessage);
+            return ValidateOutgoingCommand(
+                message.TargetEndpoint,
+                RuntimeValueHelpers.ToStringValue(bodyMessage),
+                GetAllowUnsafeRaw(bodyMap, message.Extras));
+        }
+
+        if (message.Body is IReadOnlyDictionary<string, object?> rawBodyMap &&
+            rawBodyMap.TryGetValue("raw", out var rawBodyCommand) &&
+            rawBodyCommand is not null)
+        {
+            return ValidateOutgoingCommand(
+                message.TargetEndpoint,
+                RuntimeValueHelpers.ToStringValue(rawBodyCommand),
+                GetAllowUnsafeRaw(rawBodyMap, message.Extras));
         }
 
         if (!string.IsNullOrWhiteSpace(message.Address))
         {
-            return message.Address!;
+            return ValidateOutgoingCommand(message.TargetEndpoint, message.Address!);
         }
 
-        throw new InvalidOperationException($"DG-LAB send on endpoint '{message.TargetEndpoint}' requires body: \"strength-...\", body.message, or address.");
+        throw new InvalidOperationException($"DG-LAB send on endpoint '{message.TargetEndpoint}' requires body: \"strength-...\", body.message, body.raw with allowUnsafeRaw, or address.");
+    }
+
+    public static string ValidateOutgoingCommand(string endpointName, string command, bool allowUnsafeRaw = false)
+    {
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            throw new InvalidOperationException($"DG-LAB send on endpoint '{endpointName}' requires a non-empty command message.");
+        }
+
+        command = command.Trim();
+
+        if (TryValidateStrength(endpointName, command, out var validatedStrength))
+        {
+            return validatedStrength;
+        }
+
+        if (TryValidateClear(command, out var validatedClear))
+        {
+            return validatedClear;
+        }
+
+        if (TryValidatePulse(endpointName, command, out var validatedPulse))
+        {
+            return validatedPulse;
+        }
+
+        if (command.StartsWith("feedback-", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException($"DG-LAB command '{command}' on endpoint '{endpointName}' is inbound feedback and cannot be sent outbound.");
+        }
+
+        if (!allowUnsafeRaw)
+        {
+            throw new InvalidOperationException(
+                $"DG-LAB command '{command}' on endpoint '{endpointName}' is not in the validated safe command set. " +
+                "Use body.raw with allowUnsafeRaw: true only for advanced commands you have reviewed.");
+        }
+
+        return command;
     }
 
     public static DglabSocketEnvelope? Parse(byte[] payload)
@@ -538,5 +590,147 @@ internal static class DglabSocketMessage
         }
 
         return [message];
+    }
+
+    private static bool GetAllowUnsafeRaw(IReadOnlyDictionary<string, object?> bodyMap, IReadOnlyDictionary<string, object?> extras)
+    {
+        if (TryReadBoolean(bodyMap, "allowUnsafeRaw", out var bodyAllowUnsafeRaw))
+        {
+            return bodyAllowUnsafeRaw;
+        }
+
+        if (TryReadBoolean(extras, "allowUnsafeRaw", out var extrasAllowUnsafeRaw))
+        {
+            return extrasAllowUnsafeRaw;
+        }
+
+        return false;
+    }
+
+    private static bool TryReadBoolean(IReadOnlyDictionary<string, object?> map, string key, out bool value)
+    {
+        if (!map.TryGetValue(key, out var raw) || raw is null)
+        {
+            value = false;
+            return false;
+        }
+
+        switch (raw)
+        {
+            case bool boolValue:
+                value = boolValue;
+                return true;
+            case string text when bool.TryParse(text, out var parsed):
+                value = parsed;
+                return true;
+            case byte byteValue:
+                value = byteValue != 0;
+                return true;
+            case sbyte sbyteValue:
+                value = sbyteValue != 0;
+                return true;
+            case short shortValue:
+                value = shortValue != 0;
+                return true;
+            case ushort ushortValue:
+                value = ushortValue != 0;
+                return true;
+            case int intValue:
+                value = intValue != 0;
+                return true;
+            case uint uintValue:
+                value = uintValue != 0;
+                return true;
+            case long longValue:
+                value = longValue != 0;
+                return true;
+            case ulong ulongValue:
+                value = ulongValue != 0;
+                return true;
+            case float floatValue:
+                value = Math.Abs(floatValue) > float.Epsilon;
+                return true;
+            case double doubleValue:
+                value = Math.Abs(doubleValue) > double.Epsilon;
+                return true;
+            case decimal decimalValue:
+                value = decimalValue != 0;
+                return true;
+            default:
+                value = false;
+                return false;
+        }
+    }
+
+    private static bool TryValidateStrength(string endpointName, string command, out string validatedCommand)
+    {
+        var match = Regex.Match(command, @"^strength-(?<channel>[12])\+(?<mode>[012])\+(?<value>\d{1,3})$", RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            validatedCommand = string.Empty;
+            return false;
+        }
+
+        var channel = match.Groups["channel"].Value;
+        var mode = match.Groups["mode"].Value;
+        var value = int.Parse(match.Groups["value"].Value, CultureInfo.InvariantCulture);
+        if (value is < 0 or > 200)
+        {
+            throw new InvalidOperationException($"DG-LAB strength command '{command}' on endpoint '{endpointName}' must use a value between 0 and 200.");
+        }
+
+        validatedCommand = $"strength-{channel}+{mode}+{value}";
+        return true;
+    }
+
+    private static bool TryValidateClear(string command, out string validatedCommand)
+    {
+        var match = Regex.Match(command, @"^clear-(?<channel>[12])$", RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            validatedCommand = string.Empty;
+            return false;
+        }
+
+        validatedCommand = $"clear-{match.Groups["channel"].Value}";
+        return true;
+    }
+
+    private static bool TryValidatePulse(string endpointName, string command, out string validatedCommand)
+    {
+        var match = Regex.Match(command, @"^pulse-(?<channel>[AB]):(?<payload>\[.*\])$", RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            validatedCommand = string.Empty;
+            return false;
+        }
+
+        JsonNode? parsedPayload;
+        try
+        {
+            parsedPayload = JsonNode.Parse(match.Groups["payload"].Value);
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"DG-LAB pulse command '{command}' on endpoint '{endpointName}' must contain valid JSON array payload.", ex);
+        }
+
+        if (parsedPayload is not JsonArray items)
+        {
+            throw new InvalidOperationException($"DG-LAB pulse command '{command}' on endpoint '{endpointName}' must use a JSON array payload.");
+        }
+
+        if (items.Count == 0)
+        {
+            throw new InvalidOperationException($"DG-LAB pulse command '{command}' on endpoint '{endpointName}' must contain at least one pulse item.");
+        }
+
+        if (items.Count > 100)
+        {
+            throw new InvalidOperationException($"DG-LAB pulse command '{command}' on endpoint '{endpointName}' exceeds the 100-item DG-LAB pulse limit.");
+        }
+
+        validatedCommand = $"pulse-{match.Groups["channel"].Value}:{items.ToJsonString()}";
+        return true;
     }
 }

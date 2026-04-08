@@ -28,6 +28,7 @@ internal sealed class MainForm : Form
     private TextBox _dglabSocketPathTextBox = null!;
     private TextBox _dglabSocketQrUrlTextBox = null!;
     private TextBox _dglabSocketCommandTextBox = null!;
+    private CheckBox _dglabSocketUnsafeRawCheckBox = null!;
     private Label _dglabSocketStatusLabel = null!;
     private Button _dglabSocketConnectButton = null!;
     private Button _dglabSocketDisconnectButton = null!;
@@ -413,6 +414,27 @@ internal sealed class MainForm : Form
         _dglabSocketSendButton = CreateButton("Send", async (_, _) => await SendDglabSocketCommandAsync());
         _dglabSocketSendButton.Enabled = false;
         layout.Controls.Add(_dglabSocketSendButton, 6, 3);
+
+        layout.Controls.Add(CreateFieldLabel("Advanced"), 0, 4);
+        _dglabSocketUnsafeRawCheckBox = new CheckBox
+        {
+            AutoSize = true,
+            Text = "Allow unsafe raw command (advanced)",
+            Margin = new Padding(0, 2, 12, 0),
+        };
+        layout.Controls.Add(_dglabSocketUnsafeRawCheckBox, 1, 4);
+        layout.SetColumnSpan(_dglabSocketUnsafeRawCheckBox, 3);
+
+        var advancedHint = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(720, 0),
+            ForeColor = Color.FromArgb(120, 70, 0),
+            Text = "Only enable this for reviewed DG-LAB commands outside the validated strength / clear / pulse set.",
+            Margin = new Padding(0, 4, 12, 0),
+        };
+        layout.Controls.Add(advancedHint, 4, 4);
+        layout.SetColumnSpan(advancedHint, 4);
 
         group.Controls.Add(layout);
         return group;
@@ -879,6 +901,7 @@ internal sealed class MainForm : Form
         _dglabSocketConnectButton.Enabled = false;
         _dglabSocketDisconnectButton.Enabled = true;
         _dglabSocketSendButton.Enabled = false;
+        _dglabSocketUnsafeRawCheckBox.Checked = false;
         _dglabSocketQrUrlTextBox.Text = string.Empty;
         SetDglabSocketStatus("Connecting. Waiting for DG-LAB clientId...");
 
@@ -914,6 +937,7 @@ internal sealed class MainForm : Form
             _dglabSocketConnectButton.Enabled = true;
             _dglabSocketDisconnectButton.Enabled = false;
             _dglabSocketSendButton.Enabled = false;
+            _dglabSocketUnsafeRawCheckBox.Checked = false;
             SetDglabSocketStatus("Disconnected");
         }
     }
@@ -933,10 +957,13 @@ internal sealed class MainForm : Form
             return;
         }
 
+        var allowUnsafeRaw = _dglabSocketUnsafeRawCheckBox.Checked;
+
         try
         {
-            await _dglabSocketSession.SendCommandAsync(command, CancellationToken.None);
-            SetDglabSocketStatus("Sent: " + command);
+            await _dglabSocketSession.SendCommandAsync(command, CancellationToken.None, allowUnsafeRaw);
+            var mode = allowUnsafeRaw ? "advanced raw" : "validated";
+            SetDglabSocketStatus($"Sent ({mode}): {command}");
         }
         catch (Exception ex)
         {

@@ -1,4 +1,6 @@
 (function () {
+  const zh = /^zh\\b/i.test((document.documentElement.lang || navigator.language || '').toLowerCase());
+  const T = (en, zhHans) => zh ? zhHans : en;
   const templates = {
     'startup-log': `
       <xml xmlns="https://developers.google.com/blockly/xml">
@@ -222,6 +224,91 @@
             </block>
           </next>
         </block>
+      </xml>`,
+    'dglab-strength': `
+      <xml xmlns="https://developers.google.com/blockly/xml">
+        <block type="dglab_socket_endpoint" x="32" y="32">
+          <field name="NAME">dglab</field>
+          <field name="MODE">duplex</field>
+          <field name="HOST">127.0.0.1</field>
+          <field name="PORT">5678</field>
+          <field name="PATH">/</field>
+          <field name="SECURE">FALSE</field>
+          <next>
+            <block type="osc_startup_rule">
+              <statement name="STACK">
+                <block type="dglab_send_strength">
+                  <field name="TARGET">dglab</field>
+                  <field name="CHANNEL">A</field>
+                  <field name="ACTION">set</field>
+                  <field name="VALUE">50</field>
+                  <next>
+                    <block type="dglab_clear_queue">
+                      <field name="TARGET">dglab</field>
+                      <field name="CHANNEL">A</field>
+                      <next>
+                        <block type="dglab_send_pulse">
+                          <field name="TARGET">dglab</field>
+                          <field name="CHANNEL">A</field>
+                          <field name="PAYLOAD">[[10,20,30]]</field>
+                        </block>
+                      </next>
+                    </block>
+                  </next>
+                </block>
+              </statement>
+            </block>
+          </next>
+        </block>
+      </xml>`,
+    'dglab-events': `
+      <xml xmlns="https://developers.google.com/blockly/xml">
+        <block type="dglab_socket_endpoint" x="32" y="32">
+          <field name="NAME">dglab</field>
+          <field name="MODE">duplex</field>
+          <field name="HOST">127.0.0.1</field>
+          <field name="PORT">5678</field>
+          <field name="PATH">/</field>
+          <field name="SECURE">FALSE</field>
+          <next>
+            <block type="dglab_bind_rule">
+              <field name="ENDPOINT">dglab</field>
+              <field name="STATUS">200</field>
+              <statement name="STACK">
+                <block type="dglab_send_strength">
+                  <field name="TARGET">dglab</field>
+                  <field name="CHANNEL">A</field>
+                  <field name="ACTION">set</field>
+                  <field name="VALUE">30</field>
+                </block>
+              </statement>
+              <next>
+                <block type="dglab_feedback_rule">
+                  <field name="ENDPOINT">dglab</field>
+                  <field name="CONDITION">arg(0) == 0</field>
+                  <statement name="STACK">
+                    <block type="osc_log">
+                      <field name="LEVEL">info</field>
+                      <field name="VALUE">body("message")</field>
+                    </block>
+                  </statement>
+                  <next>
+                    <block type="dglab_strength_rule">
+                      <field name="ENDPOINT">dglab</field>
+                      <field name="CONDITION">true</field>
+                      <statement name="STACK">
+                        <block type="osc_log">
+                          <field name="LEVEL">info</field>
+                          <field name="VALUE">body("message")</field>
+                        </block>
+                      </statement>
+                    </block>
+                  </next>
+                </block>
+              </next>
+            </block>
+          </next>
+        </block>
       </xml>`
   };
 
@@ -234,6 +321,7 @@
   };
 
   window.addEventListener('load', () => {
+    applyLocalizedChrome();
     try {
       initializeEditor();
     } catch (error) {
@@ -246,7 +334,7 @@
     const status = document.getElementById('status');
     const postButton = document.getElementById('postButton');
     const loadTemplateButton = document.getElementById('loadTemplateButton');
-    setStatus('Initializing Blockly...');
+    setStatus(T('Initializing Blockly...', '正在初始化 Blockly...'));
     postButton.addEventListener('click', () => postToHost('manual'));
     loadTemplateButton.addEventListener('click', loadSelectedTemplate);
     if (hasWebViewHost()) {
@@ -254,12 +342,12 @@
     }
 
     if (!window.Blockly || !window.OSCControlBlocklyGenerator) {
-      status.textContent = 'Blockly vendor files are missing. Add them under BlocklyAssets/vendor/blockly/.';
-      document.getElementById('scriptPreview').textContent = 'Blockly is not loaded yet. The OSCControl scenario editor is ready, but it needs the Blockly vendor bundle before it can render blocks.';
+      status.textContent = T('Blockly vendor files are missing. Add them under BlocklyAssets/vendor/blockly/.', '缺少 Blockly vendor 文件。请将它们放到 BlocklyAssets/vendor/blockly/ 下。');
+      document.getElementById('scriptPreview').textContent = T('Blockly is not loaded yet. The OSCControl scenario editor is ready, but it needs the Blockly vendor bundle before it can render blocks.', 'Blockly 还没有加载完成。OSCControl 场景编辑器已经准备好，但还需要 Blockly vendor 资源后才能渲染积木。');
       return;
     }
 
-    setStatus('Injecting Blockly workspace...');
+    setStatus(T('Injecting Blockly workspace...', '正在装载 Blockly 工作区...'));
     state.workspace = Blockly.inject('blocklyDiv', {
       toolbox: document.getElementById('toolbox'),
       trashcan: true,
@@ -277,14 +365,64 @@
       schedulePostToHost();
     });
 
-    setStatus('Loading starter scenario...');
+    setStatus(T('Loading starter scenario...', '正在加载起始场景...'));
     loadTemplate('startup-log');
     restorePendingWorkspace();
-    setStatus(hasWebViewHost() ? 'Ready and synced to desktop' : 'Ready without WebView2 host');
+    setStatus(hasWebViewHost() ? T('Ready and synced to desktop', '已就绪，并已同步到桌面端') : T('Ready without WebView2 host', '已就绪，但未连接 WebView2 宿主'));
     postReadyToHost();
     reportDiagnostic('info', `Blockly editor initialized in ${Math.round(performance.now() - startupTime)} ms`);
   }
 
+
+  function applyLocalizedChrome() {
+    document.title = T('OSCControl Blockly Editor', 'OSCControl Blockly 编辑器');
+    setText('pageTitle', T('OSCControl Blockly Editor', 'OSCControl Blockly 编辑器'));
+    setText('scenarioLabel', T('Scenario', '场景'));
+    setText('loadTemplateButton', T('Load Scenario', '加载场景'));
+    setText('postButton', T('Apply To Desktop', '应用到桌面端'));
+    setText('previewTitle', T('Generated .osccontrol', '生成的 .osccontrol'));
+    setText('hostHint', T('Changes auto-sync to the desktop host when WebView2 is attached. Use Check, Save, or Start in the desktop toolbar.', '连接 WebView2 宿主后，变更会自动同步到桌面端。使用桌面工具栏里的 Check、Save 或 Start。'));
+
+    localizeTemplateOption('startup-log', T('Startup log', '启动日志'));
+    localizeTemplateOption('environment-log', T('Environment log', '环境日志'));
+    localizeTemplateOption('osc-forward', T('OSC receive to OSC send', 'OSC 接收到 OSC 发送'));
+    localizeTemplateOption('vrchat-chatbox', T('VRChat startup chatbox', 'VRChat 启动聊天框'));
+    localizeTemplateOption('vrchat-param-input', T('VRChat param to input', 'VRChat 参数到输入'));
+    localizeTemplateOption('stateful-loop', T('Stateful loop', '状态循环'));
+    localizeTemplateOption('ws-forward', T('OSC to WebSocket body', 'OSC 到 WebSocket body'));
+    localizeTemplateOption('ws-duplex', T('WebSocket duplex echo', 'WebSocket 双工回显'));
+    localizeTemplateOption('vrchat-avatar-typing', T('VRChat avatar typing', 'VRChat Avatar typing'));
+    localizeTemplateOption('dglab-strength', T('DG-LAB strength', 'DG-LAB 强度'));
+
+    localizeCategory('Endpoints', T('Endpoints', '端点'));
+    localizeCategory('Variables', T('Variables', '变量'));
+    localizeCategory('Expressions', T('Expressions', '表达式'));
+    localizeCategory('Rules', T('Rules', '规则'));
+    localizeCategory('Actions', T('Actions', '动作'));
+    localizeCategory('Control', T('Control', '控制'));
+    localizeCategory('Raw', T('Raw', '原始'));
+  }
+
+  function setText(id, text) {
+    const node = document.getElementById(id);
+    if (node) {
+      node.textContent = text;
+    }
+  }
+
+  function localizeTemplateOption(value, text) {
+    const option = document.querySelector(`#templateSelect option[value="${value}"]`);
+    if (option) {
+      option.textContent = text;
+    }
+  }
+
+  function localizeCategory(from, to) {
+    const category = document.querySelector(`#toolbox category[name="${from}"]`);
+    if (category) {
+      category.setAttribute('name', to);
+    }
+  }
   function setStatus(message) {
     const status = document.getElementById('status');
     if (status) {
@@ -373,7 +511,7 @@
 
       updatePreview();
       postToHost('restore');
-      setStatus('Restored Blockly workspace');
+      setStatus(T('Restored Blockly workspace', '已恢复 Blockly 工作区'));
     } catch (error) {
       state.suppressEvents = false;
       reportDiagnostic('restore', 'Failed to restore Blockly workspace', error);
@@ -440,11 +578,11 @@
 
     if (hasWebViewHost()) {
       window.chrome.webview.postMessage(message);
-      document.getElementById('status').textContent = reason === 'manual' ? 'Applied to desktop' : 'Synced to desktop';
+      document.getElementById('status').textContent = reason === 'manual' ? T('Applied to desktop', '已应用到桌面端') : T('Synced to desktop', '已同步到桌面端');
       return;
     }
 
-    document.getElementById('status').textContent = 'No WebView2 host attached';
+    document.getElementById('status').textContent = T('No WebView2 host attached', '未连接 WebView2 宿主');
   }
 
   function hasWebViewHost() {

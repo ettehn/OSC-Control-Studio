@@ -99,6 +99,19 @@ public sealed class NetworkTransportDispatcherTests
             new Dictionary<string, object?>(),
             new Dictionary<string, object?>()));
         Assert.Equal("strength-1+2+50", command);
+
+        var advancedRawCommand = DglabSocketMessage.CreateCommand(new RuntimeOutboundMessage(
+            "dglab",
+            null,
+            [],
+            new Dictionary<string, object?>
+            {
+                ["raw"] = "foo-bar",
+                ["allowUnsafeRaw"] = true
+            },
+            new Dictionary<string, object?>(),
+            new Dictionary<string, object?>()));
+        Assert.Equal("foo-bar", advancedRawCommand);
     }
 
     private static (string Address, char[] TypeTags, object?[] Values) DecodeOscArguments(byte[] packet)

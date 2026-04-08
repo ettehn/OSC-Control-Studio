@@ -248,6 +248,89 @@
     return `vrchat.typing ${value}\n`;
   };
 
+
+  generator.forBlock.dglab_socket_endpoint = function (block) {
+    const name = identifier(block.getFieldValue('NAME'), 'dglab');
+    const mode = endpointMode(block.getFieldValue('MODE'));
+    const host = stringLiteral(block.getFieldValue('HOST') || '127.0.0.1');
+    const port = portNumber(block.getFieldValue('PORT'), 5678);
+    const path = stringLiteral(block.getFieldValue('PATH') || '/');
+    const secure = block.getFieldValue('SECURE') === 'TRUE' ? 'true' : 'false';
+    return `endpoint ${name}: dglab.socket {
+    mode: ${mode}
+    host: ${host}
+    port: ${port}
+    path: ${path}
+    secure: ${secure}
+    codec: json
+}
+
+`;
+  };
+
+  generator.forBlock.dglab_send_strength = function (block) {
+    const target = identifier(block.getFieldValue('TARGET'), 'dglab');
+    const channel = block.getFieldValue('CHANNEL') === 'B' ? '2' : '1';
+    const action = block.getFieldValue('ACTION') === 'increase' ? '1' : block.getFieldValue('ACTION') === 'decrease' ? '0' : '2';
+    const value = Math.min(200, Math.max(0, Number(block.getFieldValue('VALUE')) || 0));
+    const command = `strength-${channel}+${action}+${value}`;
+    return `send ${target} {
+    body: ${stringLiteral(command)}
+}
+`;
+  };
+
+  generator.forBlock.dglab_clear_queue = function (block) {
+    const target = identifier(block.getFieldValue('TARGET'), 'dglab');
+    const channel = block.getFieldValue('CHANNEL') === 'B' ? '2' : '1';
+    const command = `clear-${channel}`;
+    return `send ${target} {
+    body: ${stringLiteral(command)}
+}
+`;
+  };
+
+  generator.forBlock.dglab_send_pulse = function (block) {
+    const target = identifier(block.getFieldValue('TARGET'), 'dglab');
+    const channel = block.getFieldValue('CHANNEL') === 'B' ? 'B' : 'A';
+    const payload = (block.getFieldValue('PAYLOAD') || '[[10,20,30]]').trim() || '[[10,20,30]]';
+    const command = `pulse-${channel}:${payload}`;
+    return `send ${target} {
+    body: ${stringLiteral(command)}
+}
+`;
+  };
+
+  generator.forBlock.dglab_bind_rule = function (block) {
+    const endpoint = identifier(block.getFieldValue('ENDPOINT'), 'dglab');
+    const status = (block.getFieldValue('STATUS') || '').trim();
+    const condition = status ? `msg.address == "/dglab/bind" and body("message") == ${stringLiteral(status)}` : 'msg.address == "/dglab/bind"';
+    const body = generator.statementToCode(block, 'STACK') || '    log info body("message")\n';
+    return `on receive ${endpoint} when ${condition} [\n${body}]\n\n`;
+  };
+
+  generator.forBlock.dglab_feedback_rule = function (block) {
+    const endpoint = identifier(block.getFieldValue('ENDPOINT'), 'dglab');
+    const condition = expression(block.getFieldValue('CONDITION'), 'true');
+    const body = generator.statementToCode(block, 'STACK') || '    log info body("message")\n';
+    return `on receive ${endpoint} when msg.address == "/dglab/feedback" and ${condition} [\n${body}]\n\n`;
+  };
+
+  generator.forBlock.dglab_strength_rule = function (block) {
+    const endpoint = identifier(block.getFieldValue('ENDPOINT'), 'dglab');
+    const condition = expression(block.getFieldValue('CONDITION'), 'true');
+    const body = generator.statementToCode(block, 'STACK') || '    log info body("message")\n';
+    return `on receive ${endpoint} when msg.address == "/dglab/strength" and ${condition} [\n${body}]\n\n`;
+  };
+
+  generator.forBlock.dglab_raw_command = function (block) {
+    const target = identifier(block.getFieldValue('TARGET'), 'dglab');
+    const command = stringLiteral(block.getFieldValue('COMMAND') || 'strength-1+2+50');
+    return `send ${target} {
+    body: { raw: ${command}, allowUnsafeRaw: true }
+}
+`;
+  };
   generator.forBlock.osc_raw_step = function (block) {
     const source = (block.getFieldValue('SOURCE') || 'stop').trim();
     return `${source}\n`;
