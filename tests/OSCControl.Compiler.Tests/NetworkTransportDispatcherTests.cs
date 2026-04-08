@@ -69,6 +69,51 @@ public sealed class NetworkTransportDispatcherTests
         Assert.False(json.GetProperty("extras").GetProperty("notify").GetBoolean());
     }
 
+    [Fact]
+    public void DglabSocketMessage_MapsBindAndCommand()
+    {
+        var endpoint = new RuntimeResolvedEndpoint(
+            "dglab",
+            "dglab.socket",
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["host"] = "127.0.0.1",
+                ["port"] = 5678,
+                ["path"] = "/socket",
+                ["qrSocketBaseUrl"] = "wss://example.test"
+            });
+
+        var qrUrl = DglabSocketMessage.BuildQrUrl(endpoint, "terminal-id");
+        Assert.Equal("https://www.dungeon-lab.com/app-download.php#DGLAB-SOCKET#wss://example.test/terminal-id", qrUrl);
+
+        var message = DglabSocketMessage.ToRuntimeEvent("dglab", new DglabSocketEnvelope("bind", "terminal-id", "app-id", "200"), qrUrl);
+        Assert.Equal("/dglab/bind", message.Address);
+        Assert.Equal("200", Assert.IsType<Dictionary<string, object?>>(message.Body)["message"]);
+        Assert.Equal(qrUrl, message.Extras["qrUrl"]);
+
+        var command = DglabSocketMessage.CreateCommand(new RuntimeOutboundMessage(
+            "dglab",
+            null,
+            [],
+            "strength-1+2+50",
+            new Dictionary<string, object?>(),
+            new Dictionary<string, object?>()));
+        Assert.Equal("strength-1+2+50", command);
+
+        var advancedRawCommand = DglabSocketMessage.CreateCommand(new RuntimeOutboundMessage(
+            "dglab",
+            null,
+            [],
+            new Dictionary<string, object?>
+            {
+                ["raw"] = "foo-bar",
+                ["allowUnsafeRaw"] = true
+            },
+            new Dictionary<string, object?>(),
+            new Dictionary<string, object?>()));
+        Assert.Equal("foo-bar", advancedRawCommand);
+    }
+
     private static (string Address, char[] TypeTags, object?[] Values) DecodeOscArguments(byte[] packet)
     {
         var offset = 0;

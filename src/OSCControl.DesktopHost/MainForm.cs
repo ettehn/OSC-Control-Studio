@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using OSCControl.Compiler.Compiler;
 using OSCControl.Compiler.Diagnostics;
+using OSCControl.Compiler.Runtime;
 using OSCControl.Packaging;
 
 namespace OSCControl.DesktopHost;
@@ -19,6 +20,19 @@ internal sealed class MainForm : Form
     private readonly TabPage _blocksTab;
     private readonly TextBox _editorTextBox;
     private TextBox _blocksPreviewTextBox = null!;
+    private DglabSocketSession? _dglabSocketSession;
+    private IDisposable? _dglabSocketSubscription;
+    private CancellationTokenSource? _dglabSocketCts;
+    private TextBox _dglabSocketHostTextBox = null!;
+    private NumericUpDown _dglabSocketPortInput = null!;
+    private TextBox _dglabSocketPathTextBox = null!;
+    private TextBox _dglabSocketQrUrlTextBox = null!;
+    private TextBox _dglabSocketCommandTextBox = null!;
+    private CheckBox _dglabSocketUnsafeRawCheckBox = null!;
+    private Label _dglabSocketStatusLabel = null!;
+    private Button _dglabSocketConnectButton = null!;
+    private Button _dglabSocketDisconnectButton = null!;
+    private Button _dglabSocketSendButton = null!;
 #if OSCCONTROL_BLOCKLY_WEBVIEW2
     private string _blocklyGeneratedSource = "on startup [\r\n    log info \"ready\"\r\n]\r\n";
     private string _blocklyWorkspaceJson = string.Empty;
@@ -181,6 +195,10 @@ internal sealed class MainForm : Form
 #endif
         _blocksTab.Controls.Add(_blocksEditorRoot);
 
+        var dglabConnectionTab = new TabPage("DGLabConnection");
+        dglabConnectionTab.Controls.Add(CreateDglabConnectionPanel());
+        _editorTabs.TabPages.Add(dglabConnectionTab);
+
         var diagnosticsTab = new TabPage(L("Diagnostics", "Diagnostics"));
         _editorTabs.TabPages.Add(diagnosticsTab);
 
@@ -290,6 +308,188 @@ internal sealed class MainForm : Form
         _ => mode.ToString(),
     };
 
+    private Control CreateDglabConnectionPanel()
+    {
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Padding = new Padding(12),
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var note = new Label
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            MaximumSize = new Size(1280, 0),
+            Text = "DG-LAB Socket and BLE connections run beside script runtime. Device sessions here are not generated into .osccontrol scripts.",
+            ForeColor = Color.FromArgb(55, 55, 55),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+        root.Controls.Add(note, 0, 0);
+
+        root.Controls.Add(CreateDglabSocketManualGroup(), 0, 1);
+        root.Controls.Add(CreateDglabBleManualGroup(), 0, 2);
+
+        return root;
+    }
+
+    private Control CreateDglabSocketManualGroup()
+    {
+        var group = new GroupBox
+        {
+            Text = "DG-LAB Socket",
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(8),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 8,
+        };
+        for (var i = 0; i < 8; i++)
+        {
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+
+        layout.Controls.Add(CreateFieldLabel(L("Host", "Host")), 0, 0);
+        _dglabSocketHostTextBox = new TextBox { Text = "127.0.0.1", Width = 130, Margin = new Padding(0, 0, 12, 8) };
+        layout.Controls.Add(_dglabSocketHostTextBox, 1, 0);
+
+        layout.Controls.Add(CreateFieldLabel(L("Port", "Port")), 2, 0);
+        _dglabSocketPortInput = new NumericUpDown { Minimum = 1, Maximum = 65535, Value = 5678, Width = 80, Margin = new Padding(0, 0, 12, 8) };
+        layout.Controls.Add(_dglabSocketPortInput, 3, 0);
+
+        layout.Controls.Add(CreateFieldLabel(L("Path", "Path")), 4, 0);
+        _dglabSocketPathTextBox = new TextBox { Text = "/", Width = 100, Margin = new Padding(0, 0, 12, 8) };
+        layout.Controls.Add(_dglabSocketPathTextBox, 5, 0);
+
+        _dglabSocketConnectButton = CreateButton("Connect", async (_, _) => await ConnectDglabSocketAsync());
+        layout.Controls.Add(_dglabSocketConnectButton, 6, 0);
+
+        _dglabSocketDisconnectButton = CreateButton("Disconnect", async (_, _) => await DisconnectDglabSocketAsync());
+        _dglabSocketDisconnectButton.Enabled = false;
+        layout.Controls.Add(_dglabSocketDisconnectButton, 7, 0);
+
+        layout.Controls.Add(CreateFieldLabel("Status"), 0, 1);
+        _dglabSocketStatusLabel = new Label
+        {
+            Text = "Disconnected",
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 8, 12, 8),
+        };
+        layout.Controls.Add(_dglabSocketStatusLabel, 1, 1);
+        layout.SetColumnSpan(_dglabSocketStatusLabel, 7);
+
+        layout.Controls.Add(CreateFieldLabel("QR URL"), 0, 2);
+        _dglabSocketQrUrlTextBox = new TextBox
+        {
+            ReadOnly = true,
+            Width = 720,
+            Margin = new Padding(0, 0, 12, 8),
+        };
+        layout.Controls.Add(_dglabSocketQrUrlTextBox, 1, 2);
+        layout.SetColumnSpan(_dglabSocketQrUrlTextBox, 7);
+
+        layout.Controls.Add(CreateFieldLabel("Command"), 0, 3);
+        _dglabSocketCommandTextBox = new TextBox
+        {
+            Text = "strength-1+2+50",
+            Width = 520,
+            Margin = new Padding(0, 0, 12, 8),
+        };
+        layout.Controls.Add(_dglabSocketCommandTextBox, 1, 3);
+        layout.SetColumnSpan(_dglabSocketCommandTextBox, 5);
+
+        _dglabSocketSendButton = CreateButton("Send", async (_, _) => await SendDglabSocketCommandAsync());
+        _dglabSocketSendButton.Enabled = false;
+        layout.Controls.Add(_dglabSocketSendButton, 6, 3);
+
+        layout.Controls.Add(CreateFieldLabel("Advanced"), 0, 4);
+        _dglabSocketUnsafeRawCheckBox = new CheckBox
+        {
+            AutoSize = true,
+            Text = "Allow unsafe raw command (advanced)",
+            Margin = new Padding(0, 2, 12, 0),
+        };
+        layout.Controls.Add(_dglabSocketUnsafeRawCheckBox, 1, 4);
+        layout.SetColumnSpan(_dglabSocketUnsafeRawCheckBox, 3);
+
+        var advancedHint = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(720, 0),
+            ForeColor = Color.FromArgb(120, 70, 0),
+            Text = "Only enable this for reviewed DG-LAB commands outside the validated strength / clear / pulse set.",
+            Margin = new Padding(0, 4, 12, 0),
+        };
+        layout.Controls.Add(advancedHint, 4, 4);
+        layout.SetColumnSpan(advancedHint, 4);
+
+        group.Controls.Add(layout);
+        return group;
+    }
+    private Control CreateDglabBleManualGroup()
+    {
+        var group = new GroupBox
+        {
+            Text = "DG-LAB BLE",
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(8),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 5,
+        };
+        for (var i = 0; i < 5; i++)
+        {
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+
+        var scan = CreateButton("Scan", (_, _) => UpdateStatus("DG-LAB BLE scan is reserved for the next implementation step."));
+        scan.Enabled = false;
+        layout.Controls.Add(scan, 0, 0);
+
+        var devices = new ComboBox { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, Margin = new Padding(8, 0, 12, 8) };
+        devices.Items.Add("No device scanned");
+        devices.SelectedIndex = 0;
+        layout.Controls.Add(devices, 1, 0);
+
+        var connect = CreateButton("Connect", (_, _) => { });
+        connect.Enabled = false;
+        layout.Controls.Add(connect, 2, 0);
+
+        var disconnect = CreateButton("Disconnect", (_, _) => { });
+        disconnect.Enabled = false;
+        layout.Controls.Add(disconnect, 3, 0);
+
+        var status = new Label
+        {
+            Text = "Not connected",
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(12, 8, 0, 0),
+        };
+        layout.Controls.Add(status, 4, 0);
+
+        group.Controls.Add(layout);
+        return group;
+    }
 #if OSCCONTROL_BLOCKLY_WEBVIEW2
     private Control CreateBlocklyWebViewEditor()
     {
@@ -677,9 +877,156 @@ internal sealed class MainForm : Form
         _stepExtraTextBox.TextChanged += (_, _) => UpdateSelectedStepFromEditor();
     }
 
+    private async Task ConnectDglabSocketAsync()
+    {
+        await DisconnectDglabSocketAsync();
+
+        var endpoint = new RuntimeResolvedEndpoint(
+            "dglab-manual",
+            "dglab.socket",
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["mode"] = "duplex",
+                ["host"] = _dglabSocketHostTextBox.Text.Trim(),
+                ["port"] = Convert.ToDouble(_dglabSocketPortInput.Value),
+                ["path"] = string.IsNullOrWhiteSpace(_dglabSocketPathTextBox.Text) ? "/" : _dglabSocketPathTextBox.Text.Trim(),
+                ["secure"] = false,
+                ["codec"] = "json"
+            });
+
+        _dglabSocketCts = new CancellationTokenSource();
+        _dglabSocketSession = new DglabSocketSession(endpoint);
+        _dglabSocketSubscription = _dglabSocketSession.Subscribe(OnDglabSocketMessageAsync);
+
+        _dglabSocketConnectButton.Enabled = false;
+        _dglabSocketDisconnectButton.Enabled = true;
+        _dglabSocketSendButton.Enabled = false;
+        _dglabSocketUnsafeRawCheckBox.Checked = false;
+        _dglabSocketQrUrlTextBox.Text = string.Empty;
+        SetDglabSocketStatus("Connecting. Waiting for DG-LAB clientId...");
+
+        try
+        {
+            await _dglabSocketSession.StartAsync(_dglabSocketCts.Token);
+        }
+        catch (Exception ex)
+        {
+            await DisconnectDglabSocketAsync();
+            SetDglabSocketStatus("Connection failed: " + ex.Message);
+            UpdateStatus("DG-LAB Socket connection failed: " + ex.Message);
+        }
+    }
+
+    private async Task DisconnectDglabSocketAsync()
+    {
+        _dglabSocketCts?.Cancel();
+        _dglabSocketSubscription?.Dispose();
+        _dglabSocketSubscription = null;
+
+        if (_dglabSocketSession is not null)
+        {
+            await _dglabSocketSession.DisposeAsync();
+            _dglabSocketSession = null;
+        }
+
+        _dglabSocketCts?.Dispose();
+        _dglabSocketCts = null;
+
+        if (_dglabSocketConnectButton is not null)
+        {
+            _dglabSocketConnectButton.Enabled = true;
+            _dglabSocketDisconnectButton.Enabled = false;
+            _dglabSocketSendButton.Enabled = false;
+            _dglabSocketUnsafeRawCheckBox.Checked = false;
+            SetDglabSocketStatus("Disconnected");
+        }
+    }
+
+    private async Task SendDglabSocketCommandAsync()
+    {
+        if (_dglabSocketSession is null)
+        {
+            SetDglabSocketStatus("Connect DG-LAB Socket first.");
+            return;
+        }
+
+        var command = _dglabSocketCommandTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            SetDglabSocketStatus("Command is empty.");
+            return;
+        }
+
+        var allowUnsafeRaw = _dglabSocketUnsafeRawCheckBox.Checked;
+
+        try
+        {
+            await _dglabSocketSession.SendCommandAsync(command, CancellationToken.None, allowUnsafeRaw);
+            var mode = allowUnsafeRaw ? "advanced raw" : "validated";
+            SetDglabSocketStatus($"Sent ({mode}): {command}");
+        }
+        catch (Exception ex)
+        {
+            SetDglabSocketStatus("Send failed: " + ex.Message);
+            UpdateStatus("DG-LAB Socket send failed: " + ex.Message);
+        }
+    }
+
+    private Task OnDglabSocketMessageAsync(RuntimeEventMessage message, CancellationToken cancellationToken)
+    {
+        PostToUi(() => HandleDglabSocketMessage(message));
+        return Task.CompletedTask;
+    }
+
+    private void HandleDglabSocketMessage(RuntimeEventMessage message)
+    {
+        var type = GetDglabBodyValue(message, "type");
+        var clientId = GetDglabBodyValue(message, "clientId");
+        var targetId = GetDglabBodyValue(message, "targetId");
+        var text = GetDglabBodyValue(message, "message");
+        var qrUrl = GetDglabBodyValue(message, "qrUrl") ?? (message.Extras.TryGetValue("qrUrl", out var rawQr) ? rawQr?.ToString() : null);
+
+        if (!string.IsNullOrWhiteSpace(qrUrl))
+        {
+            _dglabSocketQrUrlTextBox.Text = qrUrl;
+        }
+
+        if (string.Equals(type, "bind", StringComparison.OrdinalIgnoreCase) && string.Equals(text, "targetId", StringComparison.OrdinalIgnoreCase))
+        {
+            SetDglabSocketStatus("Connected. Scan the QR URL in DG-LAB App. clientId=" + clientId);
+            return;
+        }
+
+        if (string.Equals(type, "bind", StringComparison.OrdinalIgnoreCase) && string.Equals(text, "200", StringComparison.OrdinalIgnoreCase))
+        {
+            _dglabSocketSendButton.Enabled = true;
+            SetDglabSocketStatus("Bound to DG-LAB App. targetId=" + targetId);
+            return;
+        }
+
+        SetDglabSocketStatus($"Received {message.Address}: {text}");
+    }
+
+    private void SetDglabSocketStatus(string status)
+    {
+        if (_dglabSocketStatusLabel is not null)
+        {
+            _dglabSocketStatusLabel.Text = status;
+        }
+
+        UpdateStatus(status);
+    }
+
+    private static string? GetDglabBodyValue(RuntimeEventMessage message, string key)
+    {
+        return message.Body is IReadOnlyDictionary<string, object?> body && body.TryGetValue(key, out var value)
+            ? value?.ToString()
+            : null;
+    }
     private async void OnFormClosedAsync(object? sender, FormClosedEventArgs e)
     {
         Enabled = false;
+        await DisconnectDglabSocketAsync();
         await _controller.DisposeAsync();
     }
 

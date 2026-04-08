@@ -3,7 +3,8 @@
     return;
   }
 
-  Blockly.defineBlocksWithJsonArray([
+  const zh = /^zh\\b/i.test((document.documentElement.lang || navigator.language || '').toLowerCase());
+  const blockDefinitions = [
     {
       "type": "osc_endpoint_udp",
       "message0": "OSC UDP endpoint %1 mode %2 host %3 port %4",
@@ -445,6 +446,122 @@
       "helpUrl": ""
     },
     {
+      "type": "dglab_socket_endpoint",
+      "message0": "DG-LAB socket endpoint %1 mode %2 host %3 port %4 path %5 secure %6",
+      "args0": [
+        { "type": "field_input", "name": "NAME", "text": "dglab" },
+        { "type": "field_dropdown", "name": "MODE", "options": [["duplex", "duplex"], ["output", "output"], ["input", "input"]] },
+        { "type": "field_input", "name": "HOST", "text": "127.0.0.1" },
+        { "type": "field_number", "name": "PORT", "value": 5678, "min": 1, "max": 65535, "precision": 1 },
+        { "type": "field_input", "name": "PATH", "text": "/" },
+        { "type": "field_checkbox", "name": "SECURE", "checked": false }
+      ],
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
+      "colour": 20,
+      "tooltip": "Declare a DG-LAB socket endpoint that uses the built-in dglab.socket transport.",
+      "helpUrl": ""
+    },
+    {
+      "type": "dglab_send_strength",
+      "message0": "DG-LAB send strength to %1 channel %2 action %3 value %4",
+      "args0": [
+        { "type": "field_input", "name": "TARGET", "text": "dglab" },
+        { "type": "field_dropdown", "name": "CHANNEL", "options": [["A", "A"], ["B", "B"]] },
+        { "type": "field_dropdown", "name": "ACTION", "options": [["set", "set"], ["increase", "increase"], ["decrease", "decrease"]] },
+        { "type": "field_number", "name": "VALUE", "value": 50, "min": 0, "max": 200, "precision": 1 }
+      ],
+      "previousStatement": "Step",
+      "nextStatement": "Step",
+      "colour": 20,
+      "tooltip": "Send a DG-LAB strength command.",
+      "helpUrl": ""
+    },
+    {
+      "type": "dglab_clear_queue",
+      "message0": "DG-LAB clear pulse queue on %1 channel %2",
+      "args0": [
+        { "type": "field_input", "name": "TARGET", "text": "dglab" },
+        { "type": "field_dropdown", "name": "CHANNEL", "options": [["A", "A"], ["B", "B"]] }
+      ],
+      "previousStatement": "Step",
+      "nextStatement": "Step",
+      "colour": 20,
+      "tooltip": "Clear the queued DG-LAB pulse data for one channel.",
+      "helpUrl": ""
+    },
+    {
+      "type": "dglab_raw_command",
+      "message0": "DG-LAB advanced raw command to %1 text %2",
+      "args0": [
+        { "type": "field_input", "name": "TARGET", "text": "dglab" },
+        { "type": "field_input", "name": "COMMAND", "text": "strength-1+2+50" }
+      ],
+      "previousStatement": "Step",
+      "nextStatement": "Step",
+      "colour": 20,
+      "tooltip": "Send a DG-LAB raw command through the explicit advanced path with allowUnsafeRaw.",
+      "helpUrl": ""
+    },
+    {
+      "type": "dglab_send_pulse",
+      "message0": "DG-LAB send pulse to %1 channel %2 payload %3",
+      "args0": [
+        { "type": "field_input", "name": "TARGET", "text": "dglab" },
+        { "type": "field_dropdown", "name": "CHANNEL", "options": [["A", "A"], ["B", "B"]] },
+        { "type": "field_input", "name": "PAYLOAD", "text": "[[10,20,30]]" }
+      ],
+      "previousStatement": "Step",
+      "nextStatement": "Step",
+      "colour": 20,
+      "tooltip": "Send a DG-LAB pulse queue payload to one channel.",
+      "helpUrl": ""
+    },
+    {
+      "type": "dglab_bind_rule",
+      "message0": "when DG-LAB %1 bind status %2 %3 %4",
+      "args0": [
+        { "type": "field_input", "name": "ENDPOINT", "text": "dglab" },
+        { "type": "field_input", "name": "STATUS", "text": "200" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
+      ],
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
+      "colour": 190,
+      "tooltip": "Run steps when a DG-LAB bind event arrives. Leave status empty to match any bind event.",
+      "helpUrl": ""
+    },
+    {
+      "type": "dglab_feedback_rule",
+      "message0": "when DG-LAB %1 feedback and %2 %3 %4",
+      "args0": [
+        { "type": "field_input", "name": "ENDPOINT", "text": "dglab" },
+        { "type": "field_input", "name": "CONDITION", "text": "arg(0) == 0" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
+      ],
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
+      "colour": 190,
+      "tooltip": "Run steps when a DG-LAB feedback event arrives and the condition matches.",
+      "helpUrl": ""
+    },
+    {
+      "type": "dglab_strength_rule",
+      "message0": "when DG-LAB %1 strength and %2 %3 %4",
+      "args0": [
+        { "type": "field_input", "name": "ENDPOINT", "text": "dglab" },
+        { "type": "field_input", "name": "CONDITION", "text": "true" },
+        { "type": "input_dummy" },
+        { "type": "input_statement", "name": "STACK", "check": "Step" }
+      ],
+      "previousStatement": "TopLevel",
+      "nextStatement": "TopLevel",
+      "colour": 190,
+      "tooltip": "Run steps when a DG-LAB strength event arrives and the condition matches.",
+      "helpUrl": ""
+    },    {
       "type": "osc_raw_step",
       "message0": "raw step %1",
       "args0": [
@@ -578,7 +695,7 @@
       "type": "osc_expr_env",
       "message0": "environment %1",
       "args0": [
-        { "type": "field_dropdown", "name": "KEY", "options": [["UTC time", "time.utc"], ["local time", "time.local"], ["timestamp", "time.timestamp"], ["process CPU %", "process.cpuPercent"], ["process memory bytes", "process.memoryBytes"], ["process thread count", "process.threadCount"], ["system memory load %", "system.memoryLoadPercent"], ["system available memory bytes", "system.memoryAvailableBytes"], ["processor count", "system.processorCount"], ["OS", "system.os"], ["architecture", "system.arch"], ["TCP listener count", "tcp.listenerCount"]] }
+        { "type": "field_dropdown", "name": "KEY", "options": [["UTC time", "time.utc"], ["local time", "time.local"], ["time-short", "time-short"], ["date", "date"], ["date-short", "date-short"], ["timestamp", "time.timestamp"], ["process CPU %", "process.cpuPercent"], ["process memory bytes", "process.memoryBytes"], ["process thread count", "process.threadCount"], ["system memory load %", "system.memoryLoadPercent"], ["system available memory bytes", "system.memoryAvailableBytes"], ["processor count", "system.processorCount"], ["OS", "system.os"], ["architecture", "system.arch"], ["TCP listener count", "tcp.listenerCount"]] }
       ],
       "output": null,
       "colour": 200,
@@ -723,5 +840,117 @@
       "tooltip": "Set VRChat chatbox typing state from an expression.",
       "helpUrl": ""
     }
-  ]);
+  ];
+
+  if (zh) {
+    localizeBlockDefinitions(blockDefinitions);
+  }
+
+  Blockly.defineBlocksWithJsonArray(blockDefinitions);
+
+  function localizeBlockDefinitions(blocks) {
+    const translations = {
+      osc_endpoint_udp: { message0: 'OSC UDP ?? %1 ?? %2 ?? %3 ?? %4', tooltip: '???? OSC UDP ???' },
+      osc_endpoint_ws: { message0: 'WebSocket %1 ?? %2 ?? %3 ?? %4 ?? %5 ?? %6 ?? %7', tooltip: '???? WebSocket ???' },
+      ws_client_endpoint: { message0: 'WebSocket ??? %1 ?? %2 ?? %3 ?? %4 ?? %5 ?? %6', tooltip: '???? WebSocket ???????????????????????' },
+      ws_server_endpoint: { message0: 'WebSocket ??? %1 ?? %2 ?? %3 ?? %4 ?? %5 ?? %6', tooltip: '???? WebSocket ?????????????????????????????????' },
+      vrchat_endpoint: { message0: 'VRChat ?? ?? %1 ?? %2 ?? %3', tooltip: '???? VRChat OSC ???' },
+      osc_variable: { message0: '???? %1 = %2', tooltip: '???????????' },
+      osc_variable_expr: { message0: '???? %1 = %2', tooltip: '???????????????' },
+      osc_startup_rule: { message0: '?????? %1 %2', tooltip: '???????????' },
+      osc_receive_rule: { message0: '? %1 ???? %2 ? %3 %4', tooltip: '????????? OSC ????????' },
+      osc_receive_rule_when: { message0: '? %1 ???? %2 ? %3 ? %4 %5', tooltip: '?????????????????????' },
+      ws_receive_rule: { message0: '? WebSocket %1 ???? %2 ? %3 %4', tooltip: '? WebSocket ?????????? JSON envelope ??????' },
+      ws_receive_rule_when: { message0: '? WebSocket %1 ???? %2 ? %3 ? %4 %5', tooltip: '? WebSocket ????????????????????' },
+      vrchat_avatar_rule: { message0: '? VRChat Avatar ??? %1 %2', tooltip: '? VRChat ?? Avatar ????????' },
+      vrchat_builtin_param_rule: { message0: '? VRChat ?????? %1 ??? %2 %3', tooltip: '?? VRChat ?? Avatar ???????? VRChat ????????? OSCControl ???' },
+      vrchat_param_rule: { message0: '? VRChat ????? %1 ??? %2 %3', tooltip: '? VRChat ??? Avatar ????????????????????????' },
+      osc_log: { message0: '???? ??/??? %1 %2', tooltip: '???????????????? DSL?' },
+      osc_store: { message0: '?? %1 = %2', tooltip: '?????????' },
+      osc_send_simple: { message0: '?? OSC args ? %1 ?? %2 ?? %3', tooltip: '???? OSC args ???' },
+      osc_send_body: { message0: '?? body ? %1 ?? %2 body %3', tooltip: '??????? body?' },
+      ws_send_json: { message0: '?? WebSocket JSON ? %1 ?? %2 body %3', tooltip: '???? JSON WebSocket envelope??? ws.server ????????????? ws.client ????????' },
+      ws_send_text: { message0: '?? WebSocket ??? %1 ?? %2', tooltip: '???? WebSocket body??????? DSL?????????? text codec ???' },
+      ws_send_json_expr: { message0: '?? WebSocket JSON ? %1 ?? %2 body %3', tooltip: '???????? body ? JSON WebSocket envelope?' },
+      osc_if: { message0: '?? %1 %2 %3', tooltip: '????????????' },
+      osc_if_else: { message0: '?? %1 %2 ? %3 ?? %4', tooltip: '???????????????????' },
+      osc_while: { message0: '? %1 ??? %2 %3', tooltip: '???????????????' },
+      osc_stop: { message0: '????', tooltip: '???????' },
+      osc_break: { message0: '????', tooltip: '???????' },
+      osc_continue: { message0: '????', tooltip: '?????????????' },
+      vrchat_chat: { message0: 'VRChat ??? ??/??? %1 ?? %2 ?? %3', tooltip: '? VRChat ?????????????????? DSL?' },
+      vrchat_input: { message0: 'VRChat ?? %1 = %2', tooltip: '???? VRChat ????' },
+      vrchat_param: { message0: 'VRChat ?? %1 = %2', tooltip: '???? VRChat ??? Avatar ???VRChat ?? Avatar ???????' },
+      vrchat_typing: { message0: 'VRChat typing %1', tooltip: '?? VRChat ??? typing ???' },
+      dglab_socket_endpoint: { message0: 'DG-LAB socket ?? %1 ?? %2 ?? %3 ?? %4 ?? %5 secure %6', tooltip: '???????? dglab.socket transport ? DG-LAB socket ???' },
+      dglab_send_strength: { message0: 'DG-LAB ????? %1 ?? %2 ?? %3 ?? %4', tooltip: '???? DG-LAB ?????' },
+      dglab_clear_queue: { message0: 'DG-LAB ?????? ?? %1 ?? %2', tooltip: '?????????? DG-LAB pulse ???' },
+      dglab_send_pulse: { message0: 'DG-LAB ?? pulse ? %1 ?? %2 ?? %3', tooltip: '???? DG-LAB pulse ?????' },
+      dglab_bind_rule: { message0: '? DG-LAB bind ?? %1 ?? %2 ? %3 %4', tooltip: '???? DG-LAB bind ????????' },
+      dglab_feedback_rule: { message0: '? DG-LAB feedback ?? %1 ? %2 ? %3 %4', tooltip: '???? DG-LAB feedback ?????????????' },
+      dglab_strength_rule: { message0: '? DG-LAB strength ?? %1 ? %2 ? %3 %4', tooltip: '???? DG-LAB strength ?????????????' },
+      dglab_raw_command: { message0: 'DG-LAB ?? raw ??? %1 ?? %2', tooltip: '?? allowUnsafeRaw ????????? DG-LAB ?????' },
+      osc_raw_step: { message0: '???? %1', tooltip: '? Blockly ?????????????? OSCControl ???' },
+      osc_expr_number: { message0: '?? %1', tooltip: '??????' },
+      osc_expr_string: { message0: '?? %1', tooltip: '???????' },
+      osc_expr_boolean: { message0: '?? %1', tooltip: '??????' },
+      osc_expr_identifier: { message0: '???? %1', tooltip: '????????????' },
+      osc_expr_variable: { message0: '???? %1', tooltip: '???????????????' },
+      osc_expr_arg: { message0: '?? %1', tooltip: '??????? OSC ???' },
+      osc_expr_msg_field: { message0: '?? %1', tooltip: '???????' },
+      osc_expr_binary: { message0: '%1 %2 %3', tooltip: '?????????' },
+      osc_expr_unary: { message0: '%1 %2', tooltip: '?????????' },
+      osc_expr_call1: { message0: '%1 ( %2 )', tooltip: '????????????' },
+      osc_expr_env: { message0: '?? %1', tooltip: '??????????' },
+      osc_expr_tcp_listening: { message0: 'TCP ?? %1 ??? %2 ???', tooltip: '??? TCP ??????? true???????????????????' },
+      osc_expr_env_snapshot: { message0: '????', tooltip: '??????????????? TCP ??????????' },
+      osc_expr_raw: { message0: '????? %1', tooltip: '???? OSCControl ????' },
+      osc_log_expr: { message0: '???? %1 %2', tooltip: '??????????????' },
+      osc_store_expr: { message0: '?? %1 = %2', tooltip: '?????????????' },
+      osc_if_expr: { message0: '?? %1 %2 %3', tooltip: '??????????????' },
+      osc_if_else_expr: { message0: '?? %1 %2 ? %3 ?? %4', tooltip: '????????????????????' },
+      osc_while_expr: { message0: '? %1 ??? %2 %3', tooltip: '????????????????' },
+      vrchat_input_expr: { message0: 'VRChat ?? %1 = %2', tooltip: '???????? VRChat ????' },
+      vrchat_param_expr: { message0: 'VRChat ?? %1 = %2', tooltip: '???????? VRChat ??? Avatar ???VRChat ?? Avatar ???????' },
+      vrchat_typing_expr: { message0: 'VRChat typing %1', tooltip: '?????? VRChat ??? typing ???' }
+    };
+
+    const optionTranslations = {
+      osc_endpoint_udp: { MODE: { input: '??', output: '??', duplex: '??' } },
+      osc_endpoint_ws: { TRANSPORT: { 'ws.client': '???', 'ws.server': '???' }, MODE: { input: '??', output: '??', duplex: '??' } },
+      ws_client_endpoint: { MODE: { duplex: '??', input: '??', output: '??' }, CODEC: { json: 'json', text: '??', bytes: '??' } },
+      ws_server_endpoint: { MODE: { duplex: '??', input: '??', output: '??' }, CODEC: { json: 'json', text: '??', bytes: '??' } },
+      osc_log: { LEVEL: { info: '??', warn: '??', error: '??' } },
+      osc_log_expr: { LEVEL: { info: '??', warn: '??', error: '??' } },
+      dglab_send_strength: { ACTION: { set: '??', increase: '??', decrease: '??' } },
+      dglab_bind_rule: { STATUS: { any: '??', targetId: 'targetId', '200': '200' } },
+      osc_expr_env: { KEY: { 'time.utc': 'UTC ??', 'time.local': '????', 'time-short': 'time-short', date: 'date', 'date-short': 'date-short', 'time.timestamp': 'timestamp', 'process.cpuPercent': '?? CPU %', 'process.memoryBytes': '???????', 'process.threadCount': '?????', 'system.memoryLoadPercent': '?????? %', 'system.memoryAvailableBytes': '?????????', 'system.processorCount': '?????', 'system.os': '????', 'system.arch': '??', 'tcp.listenerCount': 'TCP ????' } }
+    };
+
+    for (const block of blocks) {
+      const translation = translations[block.type];
+      if (translation) {
+        if (translation.message0) {
+          block.message0 = translation.message0;
+        }
+        if (translation.tooltip) {
+          block.tooltip = translation.tooltip;
+        }
+      }
+
+      const fieldTranslations = optionTranslations[block.type];
+      if (!fieldTranslations || !Array.isArray(block.args0)) {
+        continue;
+      }
+
+      for (const arg of block.args0) {
+        const options = fieldTranslations[arg.name];
+        if (!options || !Array.isArray(arg.options)) {
+          continue;
+        }
+
+        arg.options = arg.options.map(([label, value]) => [options[value] || label, value]);
+      }
+    }
+  }
 }());

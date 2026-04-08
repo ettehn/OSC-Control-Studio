@@ -1,5 +1,6 @@
 <!doctype html>
 <html lang="en">
+<!-- locale is updated at runtime before Blockly UI initializes -->
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,11 +10,11 @@
 <body>
   <header class="toolbar">
     <div class="title-block">
-      <strong>OSCControl Blockly Editor</strong>
+      <strong id="pageTitle">OSCControl Blockly Editor</strong>
       <span id="status">Loading Blockly...</span>
     </div>
     <label class="template-picker">
-      Scenario
+      <span id="scenarioLabel">Scenario</span>
       <select id="templateSelect">
         <option value="startup-log">Startup log</option>
         <option value="environment-log">Environment log</option>
@@ -24,6 +25,8 @@
         <option value="ws-forward">OSC to WebSocket body</option>
         <option value="ws-duplex">WebSocket duplex echo</option>
         <option value="vrchat-avatar-typing">VRChat avatar typing</option>
+        <option value="dglab-strength">DG-LAB strength</option>
+        <option value="dglab-events">DG-LAB events</option>
       </select>
     </label>
     <button id="loadTemplateButton" type="button">Load Scenario</button>
@@ -33,7 +36,7 @@
   <main class="layout">
     <section id="blocklyDiv" aria-label="Blockly workspace"></section>
     <aside class="preview">
-      <h2>Generated .osccontrol</h2>
+      <h2 id="previewTitle">Generated .osccontrol</h2>
       <p id="hostHint">Changes auto-sync to the desktop host when WebView2 is attached. Use Check, Save, or Start in the desktop toolbar.</p>
       <pre id="scriptPreview"></pre>
     </aside>
@@ -95,6 +98,9 @@
       <block type="vrchat_avatar_rule"></block>
       <block type="vrchat_builtin_param_rule"></block>
       <block type="vrchat_param_rule"></block>
+      <block type="dglab_bind_rule"></block>
+      <block type="dglab_feedback_rule"></block>
+      <block type="dglab_strength_rule"></block>
     </category>
     <category name="Actions" colour="#d97706">
       <block type="osc_log_expr">
@@ -144,6 +150,13 @@
       <block type="osc_break"></block>
       <block type="osc_continue"></block>
     </category>
+    <category name="DG-LAB" colour="#ea580c">
+      <block type="dglab_socket_endpoint"></block>
+      <block type="dglab_send_strength"></block>
+      <block type="dglab_clear_queue"></block>
+      <block type="dglab_send_pulse"></block>
+      <block type="dglab_raw_command"></block>
+    </category>
     <category name="VRChat" colour="#db2777">
       <block type="vrchat_chat"></block>
       <block type="vrchat_input"></block>
@@ -167,7 +180,13 @@
   <!-- Vendored Blockly runtime files live under vendor/blockly/. Refresh them intentionally when updating Blockly. -->
   <script src="vendor/blockly/blockly_compressed.js"></script>
   <script src="vendor/blockly/blocks_compressed.js"></script>
-  <script src="vendor/blockly/msg/en.js"></script>
+  <script>
+  (function () {
+    const locale = /^zh\b/i.test((navigator.language || '').toLowerCase()) ? 'zh-hans' : 'en';
+    document.documentElement.lang = locale === 'zh-hans' ? 'zh-Hans' : 'en';
+    document.write('<script src="vendor/blockly/msg/' + locale + '.js"><\\/script>');
+  }());
+</script>
   <script src="osccontrol-blocks.js"></script>
   <script src="osccontrol-generator.js"></script>
   <script src="osccontrol-editor.js"></script>
