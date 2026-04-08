@@ -1,5 +1,4 @@
 (function () {
-  try {
   const BlocklyInstance = (typeof globalThis !== 'undefined' && globalThis.Blockly)
     || (typeof window !== 'undefined' && window.Blockly)
     || (typeof self !== 'undefined' && self.Blockly)
@@ -8,7 +7,7 @@
     return;
   }
 
-  const BlocklyApi = BlocklyInstance;
+  const Blockly = BlocklyInstance;
 
   const zh = /^zh\\b/i.test((document.documentElement.lang || navigator.language || '').toLowerCase());
   const blockDefinitions = [
@@ -864,10 +863,10 @@
     } catch (_) { }
   };
 
-  reportBlocklyBlocksDiagnostic('info', 'osc_startup_rule before define=' + typeof (BlocklyApi.Blocks && BlocklyApi.Blocks.osc_startup_rule));
+  reportBlocklyBlocksDiagnostic('info', 'osc_startup_rule before define=' + typeof (Blockly.Blocks && Blockly.Blocks.osc_startup_rule));
   try {
-    BlocklyApi.defineBlocksWithJsonArray(blockDefinitions);
-    reportBlocklyBlocksDiagnostic('info', 'osc_startup_rule after define=' + typeof (BlocklyApi.Blocks && BlocklyApi.Blocks.osc_startup_rule));
+    Blockly.defineBlocksWithJsonArray(blockDefinitions);
+    reportBlocklyBlocksDiagnostic('info', 'osc_startup_rule after define=' + typeof (Blockly.Blocks && Blockly.Blocks.osc_startup_rule));
   } catch (error) {
     reportBlocklyBlocksDiagnostic('blocks', 'defineBlocksWithJsonArray failed: ' + (error && error.stack ? error.stack : error));
     throw error;
@@ -876,7 +875,7 @@
   installManualBlockOverrides();
 
   function installManualBlockOverrides() {
-    BlocklyApi.Blocks.osc_startup_rule = {
+    Blockly.Blocks.osc_startup_rule = {
       init() {
         this.appendDummyInput().appendField(zh ? '??????' : 'when app starts');
         this.appendStatementInput('STACK').setCheck('Step');
@@ -993,16 +992,5 @@
         arg.options = arg.options.map(([label, value]) => [options[value] || label, value]);
       }
     }
-  }
-  } catch (error) {
-    try {
-      const message = error && error.stack ? error.stack : String(error);
-      if (typeof window !== 'undefined' && window.chrome && window.chrome.webview) {
-        window.chrome.webview.postMessage({ kind: 'osccontrol-blockly-diagnostic', level: 'blocks-top', message });
-      } else if (typeof console !== 'undefined' && console.error) {
-        console.error('[osccontrol-blocks][top]', message);
-      }
-    } catch (_) { }
-    throw error;
   }
 }());

@@ -530,7 +530,6 @@
   function safeLoadTemplate(name, reason) {
     try {
       loadTemplate(name);
-      return true;
     } catch (error) {
       state.suppressEvents = true;
       try {
@@ -544,7 +543,6 @@
       if (reason === 'manual') {
         postToHost('template-failed');
       }
-      return false;
     }
   }
 

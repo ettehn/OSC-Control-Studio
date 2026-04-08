@@ -1,5 +1,7 @@
 #if OSCCONTROL_BLOCKLY_WEBVIEW2
 using System.Diagnostics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
@@ -157,7 +159,7 @@ internal sealed class BlocklyWebViewHost : UserControl
             _webView.CoreWebView2.ProcessFailed += (_, args) => Program.Log($"Blockly WebView2 process failed: {args.ProcessFailedKind}");
             _webView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
             await _webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(PageDiagnosticsScript);
-            _webView.CoreWebView2.Navigate(new Uri(_indexPath).AbsoluteUri);
+            _webView.CoreWebView2.Navigate(BuildIndexNavigateUri().AbsoluteUri);
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or InvalidOperationException or NotSupportedException or FileNotFoundException or IOException or System.Runtime.InteropServices.COMException)
         {
@@ -275,10 +277,11 @@ internal sealed class BlocklyWebViewHost : UserControl
 
     private static string ResolveWritableUserDataFolder()
     {
+        var assetVersion = GetBlocklyAssetVersionToken();
         var candidates = new List<string>();
-        AddCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
-        candidates.Add(Path.Combine(AppContext.BaseDirectory, ".webview2-user-data"));
-        AddCandidate(candidates, Path.GetTempPath());
+        AddCandidate(candidates, Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), assetVersion);
+        candidates.Add(Path.Combine(AppContext.BaseDirectory, ".webview2-user-data", assetVersion));
+        AddCandidate(candidates, Path.GetTempPath(), assetVersion);
 
         foreach (var candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -298,14 +301,62 @@ internal sealed class BlocklyWebViewHost : UserControl
 
         throw new UnauthorizedAccessException("No writable WebView2 user data folder was found.");
 
-        static void AddCandidate(List<string> candidates, string root)
+        static void AddCandidate(List<string> candidates, string root, string assetVersion)
         {
             if (string.IsNullOrWhiteSpace(root))
             {
                 return;
             }
 
-            candidates.Add(Path.Combine(root, "OSCControl.DesktopHost", "WebView2UserData"));
+            candidates.Add(Path.Combine(root, "OSCControl.DesktopHost", "WebView2UserData", assetVersion));
+        }
+    }
+
+    private Uri BuildIndexNavigateUri()
+    {
+        var builder = new UriBuilder(new Uri(_indexPath).AbsoluteUri)
+        {
+            Query = "v=" + Uri.EscapeDataString(GetBlocklyAssetVersionToken())
+        };
+
+        return builder.Uri;
+    }
+
+    private static string GetBlocklyAssetVersionToken()
+    {
+        try
+        {
+            var assetRoot = Path.Combine(AppContext.BaseDirectory, "BlocklyAssets");
+            var assets = new[]
+            {
+                Path.Combine(assetRoot, "index.html"),
+                Path.Combine(assetRoot, "osccontrol-blocks.js"),
+                Path.Combine(assetRoot, "osccontrol-editor.js"),
+                Path.Combine(assetRoot, "osccontrol-generator.js"),
+                Path.Combine(assetRoot, "styles.css")
+            };
+
+            using var sha = SHA256.Create();
+            foreach (var asset in assets)
+            {
+                if (!File.Exists(asset))
+                {
+                    continue;
+                }
+
+                var info = new FileInfo(asset);
+                var line = $"{info.Name}|{info.Length}|{info.LastWriteTimeUtc.Ticks}\n";
+                var bytes = Encoding.UTF8.GetBytes(line);
+                sha.TransformBlock(bytes, 0, bytes.Length, null, 0);
+            }
+
+            sha.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+            var hash = Convert.ToHexString(sha.Hash ?? Array.Empty<byte>()).ToLowerInvariant();
+            return hash.Length >= 12 ? hash[..12] : "default";
+        }
+        catch
+        {
+            return "default";
         }
     }
 

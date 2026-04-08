@@ -187,21 +187,7 @@
     document.write('<script src="vendor/blockly/msg/' + locale + '.js"><\\/script>');
   }());
 </script>
-  <script>
-  window.reportBlocklyAsset = function reportBlocklyAsset(level, message) {
-    try {
-      if (window.chrome && window.chrome.webview) {
-        window.chrome.webview.postMessage({ kind: 'osccontrol-blockly-diagnostic', level, message });
-      } else {
-        console.log('[blockly-asset][' + level + '] ' + message);
-      }
-    } catch (_) { }
-  }
-</script>
-  <script src="osccontrol-blocks.js" onload="window.reportBlocklyAsset('osccontrol-blocks-loaded', 'osccontrol-blocks.js loaded')" onerror="window.reportBlocklyAsset('osccontrol-blocks-error', 'osccontrol-blocks.js failed to load')"></script>
-  <script>
-  window.reportBlocklyAsset('osccontrol-blocks-state', 'after script tag block=' + typeof (window.Blockly && window.Blockly.Blocks && window.Blockly.Blocks.osc_startup_rule));
-</script>
+  <script src="osccontrol-blocks.js"></script>
   <script src="osccontrol-generator.js"></script>
   <script src="osccontrol-editor.js"></script>
 </body>
