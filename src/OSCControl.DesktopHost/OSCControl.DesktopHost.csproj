@@ -9,7 +9,7 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <EnableBlocklyWebView2 Condition="'$(EnableBlocklyWebView2)' == ''">false</EnableBlocklyWebView2>
+    <EnableBlocklyWebView2 Condition="'$(EnableBlocklyWebView2)' == ''">true</EnableBlocklyWebView2>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(EnableBlocklyWebView2)' == 'true'">

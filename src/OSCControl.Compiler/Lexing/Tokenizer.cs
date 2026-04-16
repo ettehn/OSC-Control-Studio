@@ -225,6 +225,11 @@ public sealed class Tokenizer
             _position += 7;
             text = "ws.server";
         }
+        else if (!IsAtEnd && text == "dglab" && Current == '.' && MatchDottedKeyword(".socket"))
+        {
+            _position += 7;
+            text = "dglab.socket";
+        }
 
         var kind = Keywords.TryGetValue(text, out var keywordKind)
             ? keywordKind

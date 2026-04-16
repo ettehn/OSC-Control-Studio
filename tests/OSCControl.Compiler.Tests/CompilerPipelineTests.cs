@@ -102,6 +102,16 @@ on receive oscIn when msg.body.value == 1 [
     }
 
     [Fact]
+    public void Tokenizer_Recognizes_DglabSocket_DottedTransport()
+    {
+        var tokenizer = new Tokenizer(new SourceText("endpoint dglab: dglab.socket {}"));
+
+        var tokens = tokenizer.Tokenize().TakeWhile(t => t.Kind != TokenKind.EndOfFile).ToArray();
+
+        Assert.Contains(tokens, token => token.Kind == TokenKind.Identifier && token.Text == "dglab.socket");
+    }
+
+    [Fact]
     public void Compile_FunctionDeclaration_LowersToRuntimePlan()
     {
         const string source = """
@@ -263,6 +273,72 @@ on vrchat.avatar_change [
     }
 
     [Fact]
+    public void Compile_DglabSocketEndpoint_AndSend_LowersToRuntimePlan()
+    {
+        const string source = """
+endpoint dglab: dglab.socket {
+    mode: duplex
+    host: "127.0.0.1"
+    port: 5678
+    path: "/"
+    secure: false
+    codec: json
+}
+
+on startup [
+    send dglab {
+        body: "strength-1+2+50"
+    }
+]
+""";
+
+        var result = new CompilerPipeline().Compile(source);
+
+        Assert.False(result.HasErrors);
+
+        var lowered = Assert.IsType<LoweredProgram>(result.Lowered);
+        var endpoint = Assert.Single(lowered.Endpoints);
+        Assert.Equal("dglab.socket", endpoint.EndpointType);
+
+        var plan = Assert.IsType<RuntimePlan>(result.Plan);
+        var runtimeEndpoint = Assert.Single(plan.Endpoints);
+        Assert.Equal("dglab.socket", runtimeEndpoint.TransportKind);
+        var send = Assert.IsType<RuntimeTransportSendPlan>(Assert.Single(Assert.Single(plan.Rules).Steps));
+        Assert.Equal("dglab", send.TargetEndpoint);
+        Assert.Equal("strength-1+2+50", Assert.IsType<RuntimeStringPlan>(send.Message.Body).Value);
+    }
+
+    [Fact]
+    public void Compile_DglabAdvancedRawBody_LowersToRuntimePlan()
+    {
+        const string source = """
+on startup [
+    send dglab {
+        body: { raw: "foo-bar", allowUnsafeRaw: true }
+    }
+]
+""";
+
+        var result = new CompilerPipeline().Compile(source);
+
+        Assert.False(result.HasErrors);
+
+        var plan = Assert.IsType<RuntimePlan>(result.Plan);
+        var send = Assert.IsType<RuntimeTransportSendPlan>(Assert.Single(Assert.Single(plan.Rules).Steps));
+        var body = Assert.IsType<RuntimeObjectPlan>(send.Message.Body);
+        Assert.Collection(
+            body.Properties,
+            property =>
+            {
+                Assert.Equal("raw", property.Key);
+                Assert.Equal("foo-bar", Assert.IsType<RuntimeStringPlan>(property.Value).Value);
+            },
+            property =>
+            {
+                Assert.Equal("allowUnsafeRaw", property.Key);
+                Assert.True(Assert.IsType<RuntimeBooleanPlan>(property.Value).Value);
+            });
+    }
     public void Compile_VrchatParamTrigger_LowersToAvatarParameterAddress()
     {
         const string source = """

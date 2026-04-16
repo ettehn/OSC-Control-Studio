@@ -109,15 +109,16 @@ The current Blockly page is no longer only a blank prototype. It includes these 
 - `VRChat startup chatbox`: declare `vrchat.endpoint`, then send a Chatbox message on startup.
 - `VRChat param to input`: declare `vrchat.endpoint`, then map a VRChat avatar parameter event to a VRChat input.
 
+DG-LAB still has a dedicated DesktopHost `DGLabConnection` tab for manual Socket/BLE control, and Blockly now also exposes a minimal script path for `dglab.socket` endpoints plus strength and queue commands.
 When the WebView2 host is enabled, Blockly changes debounce and auto-sync generated `.osccontrol` text back to the desktop host. While the `Blocks` tab is selected, desktop `Check`, `Save`, `Package App...`, and `Start` use the latest generated Blockly script.
 
 Saving from the `Blocks` tab also writes a `<script>.osccontrol.blocks.json` sidecar file. Opening or reloading the matching `.osccontrol` file restores that sidecar into the Blockly workspace when it exists.
 
 ## WebView2 Build Switch
 
-The WebView2 host path is optional so the default repository build does not require a new NuGet restore.
+The WebView2 host path is now the default desktop Blockly experience. Builds still require the `Microsoft.Web.WebView2` package to restore successfully in the local environment.
 
-Default build keeps using the existing WinForms Blocks editor:
+Default build now uses the WebView2-hosted Blockly editor:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Verify.ps1 -SkipTests
@@ -128,7 +129,7 @@ Build the experimental WebView2-hosted Blockly editor only when the `Microsoft.W
 ```powershell
 $env:APPDATA=(Join-Path (Get-Location) '.appdata')
 $env:NUGET_PACKAGES=(Join-Path (Get-Location) '.nuget\packages')
-dotnet build .\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj -m:1 -nr:false -v:minimal /p:EnableBlocklyWebView2=true
+dotnet build .\src\OSCControl.DesktopHost\OSCControl.DesktopHost.csproj -m:1 -nr:false -v:minimal
 ```
 
 The project currently pins `Microsoft.Web.WebView2` to `1.0.3856.49` when the WebView2 build switch is enabled.

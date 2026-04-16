@@ -1,12 +1,14 @@
 using System.ComponentModel;
 using OSCControl.Compiler.Compiler;
 using OSCControl.Compiler.Diagnostics;
+using OSCControl.Compiler.Runtime;
 using OSCControl.Packaging;
 
 namespace OSCControl.DesktopHost;
 
 internal sealed class MainForm : Form
 {
+    private readonly HostSettings _settings = HostSettingsStore.Load();
     private readonly RuntimeAppController _controller = new();
     private readonly BlockDocument _blocks = BlockDocument.CreateDefault();
     private readonly BindingSource _endpointBindingSource = new();
@@ -17,8 +19,33 @@ internal sealed class MainForm : Form
     private readonly TabControl _editorTabs;
     private readonly TabPage _scriptTab;
     private readonly TabPage _blocksTab;
+    private readonly TabPage _dglabConnectionTab;
+    private readonly TabPage _settingsTab;
+    private readonly TabPage _diagnosticsTab;
+    private readonly TabPage _runtimeTab;
     private readonly TextBox _editorTextBox;
     private TextBox _blocksPreviewTextBox = null!;
+    private DglabSocketSession? _dglabSocketSession;
+    private IDisposable? _dglabSocketSubscription;
+    private CancellationTokenSource? _dglabSocketCts;
+    private TextBox _dglabSocketHostTextBox = null!;
+    private NumericUpDown _dglabSocketPortInput = null!;
+    private TextBox _dglabSocketPathTextBox = null!;
+    private ComboBox _languageModeComboBox = null!;
+    private ComboBox _startPageComboBox = null!;
+    private CheckBox _autoRestoreLastFileCheckBox = null!;
+    private CheckBox _autoCheckOnEditCheckBox = null!;
+    private CheckBox _clearRuntimeLogOnStartCheckBox = null!;
+    private CheckBox _rememberWindowBoundsCheckBox = null!;
+    private TextBox _settingsDglabHostTextBox = null!;
+    private NumericUpDown _settingsDglabPortInput = null!;
+    private TextBox _settingsDglabPathTextBox = null!;
+    private TextBox _dglabSocketQrUrlTextBox = null!;
+    private TextBox _dglabSocketCommandTextBox = null!;
+    private Label _dglabSocketStatusLabel = null!;
+    private Button _dglabSocketConnectButton = null!;
+    private Button _dglabSocketDisconnectButton = null!;
+    private Button _dglabSocketSendButton = null!;
 #if OSCCONTROL_BLOCKLY_WEBVIEW2
     private string _blocklyGeneratedSource = "on startup [\r\n    log info \"ready\"\r\n]\r\n";
     private string _blocklyWorkspaceJson = string.Empty;
@@ -56,6 +83,8 @@ internal sealed class MainForm : Form
     private Button _stepBackButton = null!;
     private readonly Control _blocksEditorRoot;
     private readonly bool _useSimplifiedChinese = DesktopLocalization.UseSimplifiedChinese();
+    private bool _applyingSettings;
+    private bool _suppressAutoCheck;
     private readonly Stack<StepContainerContext> _stepContainerStack = new();
     private bool _suppressBlockEvents;
     private bool _blockSplittersInitialized;
@@ -67,6 +96,7 @@ internal sealed class MainForm : Form
         Height = 880;
         MinimumSize = new Size(1080, 720);
         StartPosition = FormStartPosition.CenterScreen;
+        ApplySavedWindowBounds();
 
         var chromeFont = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
         var monoFont = new Font("Consolas", 10.5F, FontStyle.Regular, GraphicsUnit.Point);
@@ -87,12 +117,12 @@ internal sealed class MainForm : Form
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            ColumnCount = 8,
+            ColumnCount = 9,
             Margin = new Padding(0, 0, 0, 12),
         };
         topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < 7; i++)
         {
             topPanel.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         }
@@ -128,18 +158,10 @@ internal sealed class MainForm : Form
 
         _packageButton = CreateButton(L("Package App...", "Package App..."), async (_, _) => await PackageAppAsync());
         topPanel.Controls.Add(_packageButton, 6, 0);
-
-        var runPanel = new FlowLayoutPanel
-        {
-            AutoSize = true,
-            FlowDirection = FlowDirection.LeftToRight,
-            Margin = new Padding(8, 0, 0, 0),
-        };
-        topPanel.Controls.Add(runPanel, 7, 0);
-
         _startButton = CreateButton(L("Start Host", "Start Host"), async (_, _) => await StartAsync());
         _startButton.MinimumSize = new Size(96, 0);
-        runPanel.Controls.Add(_startButton);
+        _startButton.Margin = new Padding(8, 0, 8, 0);
+        topPanel.Controls.Add(_startButton, 7, 0);
 
         _stopButton = CreateButton(L("Stop Host", "Stop Host"), async (_, _) => await StopAsync());
         _stopButton.MinimumSize = new Size(96, 0);
@@ -148,7 +170,7 @@ internal sealed class MainForm : Form
         _stopButton.FlatStyle = FlatStyle.Flat;
         _stopButton.UseVisualStyleBackColor = false;
         _stopButton.Enabled = false;
-        runPanel.Controls.Add(_stopButton);
+        topPanel.Controls.Add(_stopButton, 8, 0);
 
         _editorTabs = new TabControl
         {
@@ -181,8 +203,16 @@ internal sealed class MainForm : Form
 #endif
         _blocksTab.Controls.Add(_blocksEditorRoot);
 
-        var diagnosticsTab = new TabPage(L("Diagnostics", "Diagnostics"));
-        _editorTabs.TabPages.Add(diagnosticsTab);
+        _dglabConnectionTab = new TabPage("DGLabConnection");
+        _dglabConnectionTab.Controls.Add(CreateDglabConnectionPanel());
+        _editorTabs.TabPages.Add(_dglabConnectionTab);
+
+        _settingsTab = new TabPage(L("Settings", "Settings"));
+        _settingsTab.Controls.Add(CreateSettingsPanel());
+        _editorTabs.TabPages.Add(_settingsTab);
+
+        _diagnosticsTab = new TabPage(L("Diagnostics", "Diagnostics"));
+        _editorTabs.TabPages.Add(_diagnosticsTab);
 
         _diagnosticsView = new ListView
         {
@@ -195,10 +225,10 @@ internal sealed class MainForm : Form
         _diagnosticsView.Columns.Add(L("Line", "Line"), 60);
         _diagnosticsView.Columns.Add(L("Column", "Column"), 70);
         _diagnosticsView.Columns.Add(L("Message", "Message"), 900);
-        diagnosticsTab.Controls.Add(_diagnosticsView);
+        _diagnosticsTab.Controls.Add(_diagnosticsView);
 
-        var runtimeTab = new TabPage(L("Runtime", "Runtime"));
-        _editorTabs.TabPages.Add(runtimeTab);
+        _runtimeTab = new TabPage(L("Runtime", "Runtime"));
+        _editorTabs.TabPages.Add(_runtimeTab);
 
         _runtimeOutputTextBox = new RichTextBox
         {
@@ -208,8 +238,7 @@ internal sealed class MainForm : Form
             BackColor = Color.White,
             BorderStyle = BorderStyle.FixedSingle,
         };
-        runtimeTab.Controls.Add(_runtimeOutputTextBox);
-
+        _runtimeTab.Controls.Add(_runtimeOutputTextBox);
         var statusStrip = new StatusStrip();
         _statusLabel = new ToolStripStatusLabel(L("Idle", "Idle"));
         statusStrip.Items.Add(_statusLabel);
@@ -290,6 +319,328 @@ internal sealed class MainForm : Form
         _ => mode.ToString(),
     };
 
+    private List<OptionItem<string>> GetLanguageOptions() => new()
+    {
+        new(HostLanguageMode.System, L("System", "System")),
+        new(HostLanguageMode.English, "English"),
+        new(HostLanguageMode.SimplifiedChinese, "��������"),
+    };
+
+    private List<OptionItem<string>> GetStartPageOptions() => new()
+    {
+        new(HostStartPage.Script, L("Script", "Script")),
+        new(HostStartPage.Blocks, L("Blocks", "Blocks")),
+        new(HostStartPage.DglabConnection, "DGLabConnection"),
+        new(HostStartPage.Settings, L("Settings", "Settings")),
+        new(HostStartPage.Diagnostics, L("Diagnostics", "Diagnostics")),
+        new(HostStartPage.Runtime, L("Runtime", "Runtime")),
+    };
+
+    private static TableLayoutPanel CreateSettingsTableLayout()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 2,
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        return layout;
+    }
+
+    private ComboBox CreateOptionComboBox<T>(IReadOnlyList<OptionItem<T>> options)
+    {
+        return new ComboBox
+        {
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Width = 220,
+            Margin = new Padding(0, 0, 0, 8),
+            DisplayMember = nameof(OptionItem<T>.Label),
+            ValueMember = nameof(OptionItem<T>.Value),
+            DataSource = options
+        };
+    }
+    private Control CreateDglabConnectionPanel()
+    {
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Padding = new Padding(12),
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var note = new Label
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            MaximumSize = new Size(1280, 0),
+            Text = "DG-LAB Socket and BLE connections run beside script runtime. Device sessions here are not generated into .osccontrol scripts.",
+            ForeColor = Color.FromArgb(55, 55, 55),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+        root.Controls.Add(note, 0, 0);
+
+        root.Controls.Add(CreateDglabSocketManualGroup(), 0, 1);
+        root.Controls.Add(CreateDglabBleManualGroup(), 0, 2);
+
+        return root;
+    }
+
+    private Control CreateSettingsPanel()
+    {
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 5,
+            Padding = new Padding(12),
+            AutoScroll = true,
+        };
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var note = new Label
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            MaximumSize = new Size(1280, 0),
+            Text = L("Host-level options live here. Changes are saved immediately. Language changes apply on the next launch.", "Host-level options live here. Changes are saved immediately. Language changes apply on the next launch."),
+            ForeColor = Color.FromArgb(55, 55, 55),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+        root.Controls.Add(note, 0, 0);
+
+        var generalGroup = new GroupBox
+        {
+            Text = L("General", "General"),
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(8),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+
+        var generalLayout = CreateSettingsTableLayout();
+        generalLayout.Controls.Add(CreateFieldLabel(L("Language", "Language")), 0, 0);
+        _languageModeComboBox = CreateOptionComboBox(GetLanguageOptions());
+        generalLayout.Controls.Add(_languageModeComboBox, 1, 0);
+
+        generalLayout.Controls.Add(CreateFieldLabel(L("Start Page", "Start Page")), 0, 1);
+        _startPageComboBox = CreateOptionComboBox(GetStartPageOptions());
+        generalLayout.Controls.Add(_startPageComboBox, 1, 1);
+
+        _autoRestoreLastFileCheckBox = new CheckBox
+        {
+            AutoSize = true,
+            Text = L("Auto restore last file on launch", "Auto restore last file on launch"),
+            Margin = new Padding(0, 2, 12, 0),
+        };
+        generalLayout.Controls.Add(_autoRestoreLastFileCheckBox, 1, 2);
+
+        _rememberWindowBoundsCheckBox = new CheckBox
+        {
+            AutoSize = true,
+            Text = L("Remember window size and position", "Remember window size and position"),
+            Margin = new Padding(0, 2, 12, 0),
+        };
+        generalLayout.Controls.Add(_rememberWindowBoundsCheckBox, 1, 3);
+        generalGroup.Controls.Add(generalLayout);
+        root.Controls.Add(generalGroup, 0, 1);
+
+        var runtimeGroup = new GroupBox
+        {
+            Text = L("Runtime", "Runtime"),
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(8),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+
+        var runtimeLayout = CreateSettingsTableLayout();
+        _autoCheckOnEditCheckBox = new CheckBox
+        {
+            AutoSize = true,
+            Text = L("Auto check while editing", "Auto check while editing"),
+            Margin = new Padding(0, 2, 12, 0),
+        };
+        runtimeLayout.Controls.Add(_autoCheckOnEditCheckBox, 1, 0);
+
+        _clearRuntimeLogOnStartCheckBox = new CheckBox
+        {
+            AutoSize = true,
+            Text = L("Clear runtime log before Start Host", "Clear runtime log before Start Host"),
+            Margin = new Padding(0, 2, 12, 0),
+        };
+        runtimeLayout.Controls.Add(_clearRuntimeLogOnStartCheckBox, 1, 1);
+        runtimeGroup.Controls.Add(runtimeLayout);
+        root.Controls.Add(runtimeGroup, 0, 2);
+
+        var dglabGroup = new GroupBox
+        {
+            Text = "DG-LAB",
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(8),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+
+        var dglabLayout = CreateSettingsTableLayout();
+        dglabLayout.Controls.Add(CreateFieldLabel(L("Default Host", "Default Host")), 0, 0);
+        _settingsDglabHostTextBox = CreateFieldTextBox();
+        _settingsDglabHostTextBox.Width = 180;
+        dglabLayout.Controls.Add(_settingsDglabHostTextBox, 1, 0);
+
+        dglabLayout.Controls.Add(CreateFieldLabel(L("Default Port", "Default Port")), 0, 1);
+        _settingsDglabPortInput = new NumericUpDown { Minimum = 1, Maximum = 65535, Width = 100, Margin = new Padding(0, 0, 0, 8) };
+        dglabLayout.Controls.Add(_settingsDglabPortInput, 1, 1);
+
+        dglabLayout.Controls.Add(CreateFieldLabel(L("Default Path", "Default Path")), 0, 2);
+        _settingsDglabPathTextBox = CreateFieldTextBox();
+        _settingsDglabPathTextBox.Width = 180;
+        dglabLayout.Controls.Add(_settingsDglabPathTextBox, 1, 2);
+        dglabGroup.Controls.Add(dglabLayout);
+        root.Controls.Add(dglabGroup, 0, 3);
+
+        return root;
+    }
+    private Control CreateDglabSocketManualGroup()
+    {
+        var group = new GroupBox
+        {
+            Text = "DG-LAB Socket",
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(8),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 8,
+        };
+        for (var i = 0; i < 8; i++)
+        {
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+
+        layout.Controls.Add(CreateFieldLabel(L("Host", "Host")), 0, 0);
+        _dglabSocketHostTextBox = new TextBox { Text = _settings.DglabSocketHost, Width = 130, Margin = new Padding(0, 0, 12, 8) };
+        layout.Controls.Add(_dglabSocketHostTextBox, 1, 0);
+
+        layout.Controls.Add(CreateFieldLabel(L("Port", "Port")), 2, 0);
+        _dglabSocketPortInput = new NumericUpDown { Minimum = 1, Maximum = 65535, Value = _settings.DglabSocketPort, Width = 80, Margin = new Padding(0, 0, 12, 8) };
+        layout.Controls.Add(_dglabSocketPortInput, 3, 0);
+
+        layout.Controls.Add(CreateFieldLabel(L("Path", "Path")), 4, 0);
+        _dglabSocketPathTextBox = new TextBox { Text = _settings.DglabSocketPath, Width = 100, Margin = new Padding(0, 0, 12, 8) };
+        layout.Controls.Add(_dglabSocketPathTextBox, 5, 0);
+
+        _dglabSocketConnectButton = CreateButton("Connect", async (_, _) => await ConnectDglabSocketAsync());
+        layout.Controls.Add(_dglabSocketConnectButton, 6, 0);
+
+        _dglabSocketDisconnectButton = CreateButton("Disconnect", async (_, _) => await DisconnectDglabSocketAsync());
+        _dglabSocketDisconnectButton.Enabled = false;
+        layout.Controls.Add(_dglabSocketDisconnectButton, 7, 0);
+
+        layout.Controls.Add(CreateFieldLabel("Status"), 0, 1);
+        _dglabSocketStatusLabel = new Label
+        {
+            Text = "Disconnected",
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 8, 12, 8),
+        };
+        layout.Controls.Add(_dglabSocketStatusLabel, 1, 1);
+        layout.SetColumnSpan(_dglabSocketStatusLabel, 7);
+
+        layout.Controls.Add(CreateFieldLabel("QR URL"), 0, 2);
+        _dglabSocketQrUrlTextBox = new TextBox
+        {
+            ReadOnly = true,
+            Width = 720,
+            Margin = new Padding(0, 0, 12, 8),
+        };
+        layout.Controls.Add(_dglabSocketQrUrlTextBox, 1, 2);
+        layout.SetColumnSpan(_dglabSocketQrUrlTextBox, 7);
+
+        layout.Controls.Add(CreateFieldLabel("Command"), 0, 3);
+        _dglabSocketCommandTextBox = new TextBox
+        {
+            Text = "strength-1+2+50",
+            Width = 520,
+            Margin = new Padding(0, 0, 12, 8),
+        };
+        layout.Controls.Add(_dglabSocketCommandTextBox, 1, 3);
+        layout.SetColumnSpan(_dglabSocketCommandTextBox, 5);
+
+        _dglabSocketSendButton = CreateButton("Send", async (_, _) => await SendDglabSocketCommandAsync());
+        _dglabSocketSendButton.Enabled = false;
+        layout.Controls.Add(_dglabSocketSendButton, 6, 3);
+
+        group.Controls.Add(layout);
+        return group;
+    }
+    private Control CreateDglabBleManualGroup()
+    {
+        var group = new GroupBox
+        {
+            Text = "DG-LAB BLE",
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            Padding = new Padding(8),
+            Margin = new Padding(0, 0, 0, 12),
+        };
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            ColumnCount = 5,
+        };
+        for (var i = 0; i < 5; i++)
+        {
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        }
+
+        var scan = CreateButton("Scan", (_, _) => UpdateStatus("DG-LAB BLE scan is reserved for the next implementation step."));
+        scan.Enabled = false;
+        layout.Controls.Add(scan, 0, 0);
+
+        var devices = new ComboBox { Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Enabled = false, Margin = new Padding(8, 0, 12, 8) };
+        devices.Items.Add("No device scanned");
+        devices.SelectedIndex = 0;
+        layout.Controls.Add(devices, 1, 0);
+
+        var connect = CreateButton("Connect", (_, _) => { });
+        connect.Enabled = false;
+        layout.Controls.Add(connect, 2, 0);
+
+        var disconnect = CreateButton("Disconnect", (_, _) => { });
+        disconnect.Enabled = false;
+        layout.Controls.Add(disconnect, 3, 0);
+
+        var status = new Label
+        {
+            Text = "Not connected",
+            AutoSize = true,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(12, 8, 0, 0),
+        };
+        layout.Controls.Add(status, 4, 0);
+
+        group.Controls.Add(layout);
+        return group;
+    }
 #if OSCCONTROL_BLOCKLY_WEBVIEW2
     private Control CreateBlocklyWebViewEditor()
     {
@@ -318,10 +669,23 @@ internal sealed class MainForm : Form
         _blocklyWebViewHost = host;
         host.GeneratedScriptReceived += (_, script) =>
         {
-            _blocklyGeneratedSource = string.IsNullOrWhiteSpace(script.Source) ? _blocklyGeneratedSource : script.Source;
+            _blocklyGeneratedSource = string.IsNullOrWhiteSpace(script.Source) ? _blocklyGeneratedSource : NormalizeEditorLineEndings(script.Source);
             _blocklyWorkspaceJson = script.WorkspaceJson;
-            _editorTextBox.Text = _blocklyGeneratedSource;
-            RenderDiagnostics(_controller.Compile(_blocklyGeneratedSource));
+            _suppressAutoCheck = true;
+            try
+            {
+                _editorTextBox.Text = _blocklyGeneratedSource;
+            }
+            finally
+            {
+                _suppressAutoCheck = false;
+            }
+
+            if (_settings.AutoCheckOnEdit)
+            {
+                _ = CheckAsync();
+            }
+
             var reason = string.IsNullOrWhiteSpace(script.Reason) ? "sync" : script.Reason.Trim();
             UpdateStatus($"Blockly {reason}: {_blocklyGeneratedSource.Length} chars generated. Check/Save/Start Host now uses this script while Blocks is selected.");
         };
@@ -677,12 +1041,392 @@ internal sealed class MainForm : Form
         _stepExtraTextBox.TextChanged += (_, _) => UpdateSelectedStepFromEditor();
     }
 
-    private async void OnFormClosedAsync(object? sender, FormClosedEventArgs e)
+    private async Task ConnectDglabSocketAsync()
     {
-        Enabled = false;
-        await _controller.DisposeAsync();
+        await DisconnectDglabSocketAsync();
+
+        var endpoint = new RuntimeResolvedEndpoint(
+            "dglab-manual",
+            "dglab.socket",
+            new Dictionary<string, object?>(StringComparer.Ordinal)
+            {
+                ["mode"] = "duplex",
+                ["host"] = _dglabSocketHostTextBox.Text.Trim(),
+                ["port"] = Convert.ToDouble(_dglabSocketPortInput.Value),
+                ["path"] = string.IsNullOrWhiteSpace(_dglabSocketPathTextBox.Text) ? "/" : _dglabSocketPathTextBox.Text.Trim(),
+                ["secure"] = false,
+                ["codec"] = "json"
+            });
+
+        _dglabSocketCts = new CancellationTokenSource();
+        _dglabSocketSession = new DglabSocketSession(endpoint);
+        _dglabSocketSubscription = _dglabSocketSession.Subscribe(OnDglabSocketMessageAsync);
+
+        _dglabSocketConnectButton.Enabled = false;
+        _dglabSocketDisconnectButton.Enabled = true;
+        _dglabSocketSendButton.Enabled = false;
+        _dglabSocketQrUrlTextBox.Text = string.Empty;
+        SetDglabSocketStatus("Connecting. Waiting for DG-LAB clientId...");
+
+        try
+        {
+            await _dglabSocketSession.StartAsync(_dglabSocketCts.Token);
+        }
+        catch (Exception ex)
+        {
+            await DisconnectDglabSocketAsync();
+            SetDglabSocketStatus("Connection failed: " + ex.Message);
+            UpdateStatus("DG-LAB Socket connection failed: " + ex.Message);
+        }
     }
 
+    private async Task DisconnectDglabSocketAsync()
+    {
+        _dglabSocketCts?.Cancel();
+        _dglabSocketSubscription?.Dispose();
+        _dglabSocketSubscription = null;
+
+        if (_dglabSocketSession is not null)
+        {
+            await _dglabSocketSession.DisposeAsync();
+            _dglabSocketSession = null;
+        }
+
+        _dglabSocketCts?.Dispose();
+        _dglabSocketCts = null;
+
+        if (_dglabSocketConnectButton is not null)
+        {
+            _dglabSocketConnectButton.Enabled = true;
+            _dglabSocketDisconnectButton.Enabled = false;
+            _dglabSocketSendButton.Enabled = false;
+            SetDglabSocketStatus("Disconnected");
+        }
+    }
+
+    private async Task SendDglabSocketCommandAsync()
+    {
+        if (_dglabSocketSession is null)
+        {
+            SetDglabSocketStatus("Connect DG-LAB Socket first.");
+            return;
+        }
+
+        var command = _dglabSocketCommandTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            SetDglabSocketStatus("Command is empty.");
+            return;
+        }
+
+        var allowUnsafeRaw = _settings.DglabUnsafeRaw;
+
+        try
+        {
+            await _dglabSocketSession.SendCommandAsync(command, CancellationToken.None, allowUnsafeRaw);
+            var mode = allowUnsafeRaw ? "advanced raw" : "validated";
+            SetDglabSocketStatus($"Sent ({mode}): {command}");
+        }
+        catch (Exception ex)
+        {
+            SetDglabSocketStatus("Send failed: " + ex.Message);
+            UpdateStatus("DG-LAB Socket send failed: " + ex.Message);
+        }
+    }
+
+    private Task OnDglabSocketMessageAsync(RuntimeEventMessage message, CancellationToken cancellationToken)
+    {
+        PostToUi(() => HandleDglabSocketMessage(message));
+        return Task.CompletedTask;
+    }
+
+    private void HandleDglabSocketMessage(RuntimeEventMessage message)
+    {
+        var type = GetDglabBodyValue(message, "type");
+        var clientId = GetDglabBodyValue(message, "clientId");
+        var targetId = GetDglabBodyValue(message, "targetId");
+        var text = GetDglabBodyValue(message, "message");
+        var qrUrl = GetDglabBodyValue(message, "qrUrl") ?? (message.Extras.TryGetValue("qrUrl", out var rawQr) ? rawQr?.ToString() : null);
+
+        if (!string.IsNullOrWhiteSpace(qrUrl))
+        {
+            _dglabSocketQrUrlTextBox.Text = qrUrl;
+        }
+
+        if (string.Equals(type, "bind", StringComparison.OrdinalIgnoreCase) && string.Equals(text, "targetId", StringComparison.OrdinalIgnoreCase))
+        {
+            SetDglabSocketStatus("Connected. Scan the QR URL in DG-LAB App. clientId=" + clientId);
+            return;
+        }
+
+        if (string.Equals(type, "bind", StringComparison.OrdinalIgnoreCase) && string.Equals(text, "200", StringComparison.OrdinalIgnoreCase))
+        {
+            _dglabSocketSendButton.Enabled = true;
+            SetDglabSocketStatus("Bound to DG-LAB App. targetId=" + targetId);
+            return;
+        }
+
+        SetDglabSocketStatus($"Received {message.Address}: {text}");
+    }
+
+    private void SetDglabSocketStatus(string status)
+    {
+        if (_dglabSocketStatusLabel is not null)
+        {
+            _dglabSocketStatusLabel.Text = status;
+        }
+
+        UpdateStatus(status);
+    }
+
+    private static string? GetDglabBodyValue(RuntimeEventMessage message, string key)
+    {
+        return message.Body is IReadOnlyDictionary<string, object?> body && body.TryGetValue(key, out var value)
+            ? value?.ToString()
+            : null;
+    }
+    private void ApplySavedWindowBounds()
+    {
+        if (!_settings.RememberWindowBounds)
+        {
+            return;
+        }
+
+        if (_settings.WindowWidth is not > 0 || _settings.WindowHeight is not > 0)
+        {
+            return;
+        }
+
+        var bounds = new Rectangle(_settings.WindowLeft ?? Left, _settings.WindowTop ?? Top, _settings.WindowWidth.Value, _settings.WindowHeight.Value);
+        var screen = Screen.AllScreens.FirstOrDefault(candidate => candidate.WorkingArea.IntersectsWith(bounds));
+        if (screen is null)
+        {
+            return;
+        }
+
+        StartPosition = FormStartPosition.Manual;
+        Bounds = bounds;
+    }
+
+    private async void OnShownAsync(object? sender, EventArgs e)
+    {
+        ResetBottomSplit();
+        await RestoreLastFileIfEnabledAsync();
+        ApplyStartPageSelection();
+    }
+
+    private async Task RestoreLastFileIfEnabledAsync()
+    {
+        if (!_settings.AutoRestoreLastFile || string.IsNullOrWhiteSpace(_settings.LastOpenedPath) || !File.Exists(_settings.LastOpenedPath))
+        {
+            return;
+        }
+
+        try
+        {
+            await LoadScriptFromPathAsync(_settings.LastOpenedPath, isReload: false, statusOverride: L("Restored last file.", "Restored last file."));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            AppendRuntimeOutput($"{L("Auto restore failed", "Auto restore failed")}: {ex.Message}");
+            UpdateStatus(L("Auto restore failed", "Auto restore failed"));
+        }
+    }
+
+    private void ApplySettingsToUi()
+    {
+        _applyingSettings = true;
+        try
+        {
+            _languageModeComboBox.SelectedValue = _settings.Language;
+            _startPageComboBox.SelectedValue = _settings.StartPage;
+            _autoRestoreLastFileCheckBox.Checked = _settings.AutoRestoreLastFile;
+            _autoCheckOnEditCheckBox.Checked = _settings.AutoCheckOnEdit;
+            _clearRuntimeLogOnStartCheckBox.Checked = _settings.ClearRuntimeLogOnStart;
+            _rememberWindowBoundsCheckBox.Checked = _settings.RememberWindowBounds;
+            _settingsDglabHostTextBox.Text = _settings.DglabSocketHost;
+            _settingsDglabPortInput.Value = _settings.DglabSocketPort;
+            _settingsDglabPathTextBox.Text = _settings.DglabSocketPath;
+            UpdateDglabManualInputsFromSettings();
+        }
+        finally
+        {
+            _applyingSettings = false;
+        }
+    }
+
+    private void WireSettingsEvents()
+    {
+        _languageModeComboBox.SelectedValueChanged += (_, _) => SaveSettingsFromUi();
+        _startPageComboBox.SelectedValueChanged += (_, _) => SaveSettingsFromUi();
+
+        _autoRestoreLastFileCheckBox.CheckedChanged += (_, _) => SaveSettingsFromUi();
+        _autoCheckOnEditCheckBox.CheckedChanged += (_, _) => SaveSettingsFromUi();
+        _clearRuntimeLogOnStartCheckBox.CheckedChanged += (_, _) => SaveSettingsFromUi();
+        _rememberWindowBoundsCheckBox.CheckedChanged += (_, _) => SaveSettingsFromUi();
+        _settingsDglabHostTextBox.TextChanged += (_, _) => SaveSettingsFromUi();
+        _settingsDglabPortInput.ValueChanged += (_, _) => SaveSettingsFromUi();
+        _settingsDglabPathTextBox.TextChanged += (_, _) => SaveSettingsFromUi();
+    }
+
+    private void WireEditorEvents()
+    {
+        _editorTextBox.TextChanged += (_, _) => TriggerAutoCheckIfEnabled();
+    }
+
+    private void SaveSettingsFromUi()
+    {
+        if (_applyingSettings)
+        {
+            return;
+        }
+
+        _settings.Language = _languageModeComboBox.SelectedValue as string ?? HostLanguageMode.System;
+        _settings.StartPage = _startPageComboBox.SelectedValue as string ?? HostStartPage.Script;
+        _settings.AutoRestoreLastFile = _autoRestoreLastFileCheckBox.Checked;
+        _settings.AutoCheckOnEdit = _autoCheckOnEditCheckBox.Checked;
+        _settings.ClearRuntimeLogOnStart = _clearRuntimeLogOnStartCheckBox.Checked;
+        _settings.RememberWindowBounds = _rememberWindowBoundsCheckBox.Checked;
+        _settings.DglabSocketHost = string.IsNullOrWhiteSpace(_settingsDglabHostTextBox.Text) ? "127.0.0.1" : _settingsDglabHostTextBox.Text.Trim();
+        _settings.DglabSocketPort = Decimal.ToInt32(_settingsDglabPortInput.Value);
+        _settings.DglabSocketPath = string.IsNullOrWhiteSpace(_settingsDglabPathTextBox.Text) ? "/" : _settingsDglabPathTextBox.Text.Trim();
+        if (!_settings.DglabSocketPath.StartsWith("/", StringComparison.Ordinal))
+        {
+            _settings.DglabSocketPath = "/" + _settings.DglabSocketPath;
+        }
+
+        if (_settings.RememberWindowBounds)
+        {
+            RememberCurrentWindowBounds();
+        }
+        else
+        {
+            _settings.WindowLeft = null;
+            _settings.WindowTop = null;
+            _settings.WindowWidth = null;
+            _settings.WindowHeight = null;
+        }
+
+        HostSettingsStore.Save(_settings);
+        UpdateDglabManualInputsFromSettings();
+    }
+
+    private void UpdateDglabManualInputsFromSettings()
+    {
+        if (_dglabSocketSession is not null)
+        {
+            return;
+        }
+
+        if (_dglabSocketHostTextBox is not null)
+        {
+            _dglabSocketHostTextBox.Text = _settings.DglabSocketHost;
+        }
+
+        if (_dglabSocketPortInput is not null)
+        {
+            _dglabSocketPortInput.Value = _settings.DglabSocketPort;
+        }
+
+        if (_dglabSocketPathTextBox is not null)
+        {
+            _dglabSocketPathTextBox.Text = _settings.DglabSocketPath;
+        }
+    }
+
+    private void TriggerAutoCheckIfEnabled()
+    {
+        if (_suppressAutoCheck || !_settings.AutoCheckOnEdit)
+        {
+            return;
+        }
+
+        BeginInvoke(async () => await CheckAsync());
+    }
+
+    private void ApplyStartPageSelection()
+    {
+        var tab = _settings.StartPage switch
+        {
+            HostStartPage.Blocks => _blocksTab,
+            HostStartPage.DglabConnection => _dglabConnectionTab,
+            HostStartPage.Settings => _settingsTab,
+            HostStartPage.Diagnostics => _diagnosticsTab,
+            HostStartPage.Runtime => _runtimeTab,
+            _ => _scriptTab,
+        };
+
+        if (_editorTabs.SelectedTab != tab)
+        {
+            _editorTabs.SelectedTab = tab;
+        }
+    }
+
+    private void RememberCurrentWindowBounds()
+    {
+        if (WindowState != FormWindowState.Normal)
+        {
+            return;
+        }
+
+        _settings.WindowLeft = Bounds.Left;
+        _settings.WindowTop = Bounds.Top;
+        _settings.WindowWidth = Bounds.Width;
+        _settings.WindowHeight = Bounds.Height;
+    }
+
+    private void RememberLastOpenedPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        _settings.LastOpenedPath = path;
+        HostSettingsStore.Save(_settings);
+    }
+
+    private async Task LoadScriptFromPathAsync(string path, bool isReload, string? statusOverride = null)
+    {
+        _suppressAutoCheck = true;
+        try
+        {
+            _pathTextBox.Text = path;
+            _editorTextBox.Text = NormalizeEditorLineEndings(await File.ReadAllTextAsync(path));
+#if OSCCONTROL_BLOCKLY_WEBVIEW2
+            _blocklyGeneratedSource = _editorTextBox.Text;
+            var restoredBlocks = await LoadBlocklyWorkspaceForScriptAsync(path);
+            _editorTabs.SelectedTab = restoredBlocks ? _blocksTab : _scriptTab;
+            UpdateStatus(statusOverride ?? (restoredBlocks
+                ? (isReload ? L("Reloaded script and restored Blockly workspace.", "Reloaded script and restored Blockly workspace.") : L("Loaded script and restored Blockly workspace.", "Loaded script and restored Blockly workspace."))
+                : (isReload ? L("Reloaded script into Script tab. No Blockly workspace sidecar was found.", "Reloaded script into Script tab. No Blockly workspace sidecar was found.") : L("Loaded script into Script tab. No Blockly workspace sidecar was found.", "Loaded script into Script tab. No Blockly workspace sidecar was found."))));
+#else
+            _editorTabs.SelectedTab = _scriptTab;
+            UpdateStatus(statusOverride ?? (isReload
+                ? L("Reloaded script into Script tab. Blocks draft was left unchanged.", "Reloaded script into Script tab. Blocks draft was left unchanged.")
+                : L("Loaded script into Script tab. Blocks draft was left unchanged.", "Loaded script into Script tab. Blocks draft was left unchanged.")));
+#endif
+        }
+        finally
+        {
+            _suppressAutoCheck = false;
+        }
+
+        RememberLastOpenedPath(path);
+        await CheckAsync();
+    }
+    private async void OnFormClosedAsync(object? sender, FormClosedEventArgs e)
+    {
+        if (_settings.RememberWindowBounds)
+        {
+            RememberCurrentWindowBounds();
+        }
+
+        HostSettingsStore.Save(_settings);
+        Enabled = false;
+        await DisconnectDglabSocketAsync();
+        await _controller.DisposeAsync();
+    }
     private async Task BrowseAsync()
     {
         using var dialog = new OpenFileDialog { Filter = "OSCControl Files (*.osccontrol)|*.osccontrol|All Files (*.*)|*.*", CheckFileExists = true, Multiselect = false };
@@ -691,20 +1435,7 @@ internal sealed class MainForm : Form
             return;
         }
 
-        _pathTextBox.Text = dialog.FileName;
-        _editorTextBox.Text = await File.ReadAllTextAsync(dialog.FileName);
-#if OSCCONTROL_BLOCKLY_WEBVIEW2
-        _blocklyGeneratedSource = _editorTextBox.Text;
-        var restoredBlocks = await LoadBlocklyWorkspaceForScriptAsync(dialog.FileName);
-        _editorTabs.SelectedTab = restoredBlocks ? _blocksTab : _scriptTab;
-        UpdateStatus(restoredBlocks
-            ? L("Loaded script and restored Blockly workspace.", "Loaded script and restored Blockly workspace.")
-            : L("Loaded script into Script tab. No Blockly workspace sidecar was found.", "Loaded script into Script tab. No Blockly workspace sidecar was found."));
-#else
-        _editorTabs.SelectedTab = _scriptTab;
-        UpdateStatus(L("Loaded script into Script tab. Blocks draft was left unchanged.", "Loaded script into Script tab. Blocks draft was left unchanged."));
-#endif
-        await CheckAsync();
+        await LoadScriptFromPathAsync(dialog.FileName, isReload: false);
     }
 
     private async Task ReloadAsync()
@@ -716,21 +1447,8 @@ internal sealed class MainForm : Form
             return;
         }
 
-        _editorTextBox.Text = await File.ReadAllTextAsync(path);
-#if OSCCONTROL_BLOCKLY_WEBVIEW2
-        _blocklyGeneratedSource = _editorTextBox.Text;
-        var restoredBlocks = await LoadBlocklyWorkspaceForScriptAsync(path);
-        _editorTabs.SelectedTab = restoredBlocks ? _blocksTab : _scriptTab;
-        UpdateStatus(restoredBlocks
-            ? L("Reloaded script and restored Blockly workspace.", "Reloaded script and restored Blockly workspace.")
-            : L("Reloaded script into Script tab. No Blockly workspace sidecar was found.", "Reloaded script into Script tab. No Blockly workspace sidecar was found."));
-#else
-        _editorTabs.SelectedTab = _scriptTab;
-        UpdateStatus(L("Reloaded script into Script tab. Blocks draft was left unchanged.", "Reloaded script into Script tab. Blocks draft was left unchanged."));
-#endif
-        await CheckAsync();
+        await LoadScriptFromPathAsync(path, isReload: true);
     }
-
     private async Task SaveAsync()
     {
         var path = _pathTextBox.Text.Trim();
@@ -746,7 +1464,7 @@ internal sealed class MainForm : Form
             _pathTextBox.Text = path;
         }
 
-        var source = GetCurrentSource();
+        var source = NormalizeEditorLineEndings(GetCurrentSource());
         await File.WriteAllTextAsync(path, source);
         if (_editorTabs.SelectedTab == _blocksTab)
         {
@@ -836,7 +1554,10 @@ internal sealed class MainForm : Form
         await SetBusyAsync(true);
         try
         {
-            _runtimeOutputTextBox.Clear();
+            if (_settings.ClearRuntimeLogOnStart)
+            {
+                _runtimeOutputTextBox.Clear();
+            }
             var result = await _controller.StartAsync(GetCurrentSource(), CancellationToken.None);
             RenderDiagnostics(result);
             if (result.HasErrors)
@@ -1528,7 +2249,7 @@ internal sealed class MainForm : Form
     private void ApplyBlocksToScript()
     {
         UpdateBlocksPreview();
-        _editorTextBox.Text = _blocksPreviewTextBox.Text;
+        _editorTextBox.Text = NormalizeEditorLineEndings(_blocksPreviewTextBox.Text);
         _editorTabs.SelectedTab = _scriptTab;
         UpdateStatus(L("Applied generated script to the Script tab.", "Applied generated script to the Script tab."));
     }
@@ -1646,7 +2367,7 @@ internal sealed class MainForm : Form
             AppendRuntimeOutput($"- {warning}");
         }
 
-        UpdateStatus(_useSimplifiedChinese ? $"已导入，并附带 {imported.Warnings.Count} 条说明。" : $"Imported with {imported.Warnings.Count} note(s).");
+        UpdateStatus($"Imported with {imported.Warnings.Count} note(s).");
     }
 
     private void LoadBlocksDocument(BlockDocument document)
@@ -1736,28 +2457,27 @@ internal sealed class MainForm : Form
         var title = rule.Trigger switch
         {
             BlockTriggerKind.Startup => L("When app starts", "When app starts"),
-            BlockTriggerKind.Receive => _useSimplifiedChinese ? $"当从 {FormatDisplayValue(rule.EndpointName, "端点")} 接收到消息时" : $"When receive from {FormatDisplayValue(rule.EndpointName, "endpoint")}",
+            BlockTriggerKind.Receive => $"When receive from {FormatDisplayValue(rule.EndpointName, "endpoint")}",
             BlockTriggerKind.VrchatAvatarChange => L("When VRChat avatar changes", "When VRChat avatar changes"),
-            BlockTriggerKind.VrchatParameter => _useSimplifiedChinese ? $"当 VRChat 参数 {FormatDisplayValue(rule.EndpointName, "参数")} 变化时" : $"When VRChat param {FormatDisplayValue(rule.EndpointName, "param")} changes",
+            BlockTriggerKind.VrchatParameter => $"When VRChat param {FormatDisplayValue(rule.EndpointName, "param")} changes",
             _ => L("Rule", "Rule"),
         };
 
         var detail = rule.Trigger switch
         {
-            BlockTriggerKind.Receive when string.IsNullOrWhiteSpace(rule.Address) => (string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("No filter", "No filter") : rule.WhenExpression),
-            BlockTriggerKind.Receive => (_useSimplifiedChinese ? $"地址 {rule.Address}" : $"Address {rule.Address}") + (string.IsNullOrWhiteSpace(rule.WhenExpression) ? string.Empty : (_useSimplifiedChinese ? $" 且 {rule.WhenExpression}" : $" and {rule.WhenExpression}")),
+            BlockTriggerKind.Receive when string.IsNullOrWhiteSpace(rule.Address) => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("No filter", "No filter") : rule.WhenExpression,
+            BlockTriggerKind.Receive => $"Address {rule.Address}" + (string.IsNullOrWhiteSpace(rule.WhenExpression) ? string.Empty : $" and {rule.WhenExpression}"),
             BlockTriggerKind.VrchatAvatarChange => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("Listening to /avatar/change", "Listening to /avatar/change") : rule.WhenExpression,
             BlockTriggerKind.VrchatParameter => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("Listening to /avatar/parameters/...", "Listening to /avatar/parameters/...") : rule.WhenExpression,
             _ => string.IsNullOrWhiteSpace(rule.WhenExpression) ? L("No filter", "No filter") : rule.WhenExpression,
         };
-        var steps = rule.Steps.Count == 0 ? L("No steps yet", "No steps yet") : (_useSimplifiedChinese ? $"{rule.Steps.Count} 步" : $"{rule.Steps.Count} step(s)");
+        var steps = rule.Steps.Count == 0 ? L("No steps yet", "No steps yet") : $"{rule.Steps.Count} step(s)";
 
         TextRenderer.DrawText(e.Graphics, title, Font, new Rectangle(bounds.X + 10, bounds.Y + 8, bounds.Width - 20, 18), titleColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
         TextRenderer.DrawText(e.Graphics, detail, Font, new Rectangle(bounds.X + 10, bounds.Y + 28, bounds.Width - 20, 16), bodyColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
         TextRenderer.DrawText(e.Graphics, steps, Font, new Rectangle(bounds.X + 10, bounds.Y + 44, bounds.Width - 20, 14), bodyColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
         e.DrawFocusRectangle();
     }
-
     private void DrawStepItem(object? sender, DrawItemEventArgs e)
     {
         e.DrawBackground();
@@ -1796,16 +2516,16 @@ internal sealed class MainForm : Form
 
         var title = step.Kind switch
         {
-            BlockStepKind.Log => _useSimplifiedChinese ? $"日志 {FormatDisplayValue(step.Target, "info")}" : $"Log {FormatDisplayValue(step.Target, "info")}",
-            BlockStepKind.Store => _useSimplifiedChinese ? $"存储 {FormatDisplayValue(step.Target, "状态")}" : $"Store {FormatDisplayValue(step.Target, "state")}",
-            BlockStepKind.Send => _useSimplifiedChinese ? $"发送 {FormatDisplayValue(step.Target, "端点")}" : $"Send {FormatDisplayValue(step.Target, "endpoint")}",
+            BlockStepKind.Log => $"Log {FormatDisplayValue(step.Target, "info")}",
+            BlockStepKind.Store => $"Store {FormatDisplayValue(step.Target, "state")}",
+            BlockStepKind.Send => $"Send {FormatDisplayValue(step.Target, "endpoint")}",
             BlockStepKind.If => L("If", "If"),
             BlockStepKind.While => L("While", "While"),
             BlockStepKind.Break => L("Break", "Break"),
             BlockStepKind.Continue => L("Continue", "Continue"),
             BlockStepKind.Stop => L("Stop chain", "Stop chain"),
-            BlockStepKind.VrchatParam => _useSimplifiedChinese ? $"VRChat 参数 {FormatDisplayValue(step.Target, "参数")}" : $"VRChat param {FormatDisplayValue(step.Target, "param")}",
-            BlockStepKind.VrchatInput => _useSimplifiedChinese ? $"VRChat 输入 {FormatDisplayValue(step.Target, "输入")}" : $"VRChat input {FormatDisplayValue(step.Target, "input")}",
+            BlockStepKind.VrchatParam => $"VRChat param {FormatDisplayValue(step.Target, "param")}",
+            BlockStepKind.VrchatInput => $"VRChat input {FormatDisplayValue(step.Target, "input")}",
             BlockStepKind.VrchatChat => L("VRChat Chatbox", "VRChat Chatbox"),
             BlockStepKind.VrchatTyping => L("VRChat Typing", "VRChat Typing"),
             _ => step.Kind.ToString(),
@@ -1815,8 +2535,8 @@ internal sealed class MainForm : Form
             BlockStepKind.Log => FormatDisplayValue(step.Value, L("message", "message")),
             BlockStepKind.Store => FormatDisplayValue(step.Value, L("expression", "expression")),
             BlockStepKind.Send => $"{FormatDisplayValue(step.Value, "/address")} | {FormatPayloadMode(step.PayloadMode)} | {FormatDisplayValue(step.Extra, L("payload", "payload"))}",
-            BlockStepKind.If => _useSimplifiedChinese ? $"条件 {FormatDisplayValue(step.Value, "true")} | then {step.Children.Count} / else {step.ElseChildren.Count}" : $"Condition {FormatDisplayValue(step.Value, "true")} | then {step.Children.Count} / else {step.ElseChildren.Count}",
-            BlockStepKind.While => _useSimplifiedChinese ? $"条件 {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} 个子步骤" : $"Condition {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} child step(s)",
+            BlockStepKind.If => $"Condition {FormatDisplayValue(step.Value, "true")} | then {step.Children.Count} / else {step.ElseChildren.Count}",
+            BlockStepKind.While => $"Condition {FormatDisplayValue(step.Value, "true")} | {step.Children.Count} child step(s)",
             BlockStepKind.Break => L("Exit the current loop immediately", "Exit the current loop immediately"),
             BlockStepKind.Continue => L("Skip to the next loop iteration", "Skip to the next loop iteration"),
             BlockStepKind.Stop => L("End current rule chain immediately", "End current rule chain immediately"),
@@ -1831,8 +2551,17 @@ internal sealed class MainForm : Form
         TextRenderer.DrawText(e.Graphics, detail, Font, new Rectangle(bounds.X + 10, bounds.Y + 28, bounds.Width - 20, 16), bodyColor, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
         e.DrawFocusRectangle();
     }
-
     private static string FormatDisplayValue(string value, string fallback) => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+
+    private static string NormalizeEditorLineEndings(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return string.Empty;
+        }
+
+        return text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace("\r", "\n", StringComparison.Ordinal).Replace("\n", "\r\n", StringComparison.Ordinal);
+    }
 
     private static string GetDefaultPackageOutputRoot(string scriptPath)
     {
@@ -2104,3 +2833,20 @@ internal sealed class MainForm : Form
 
     private sealed record StepContainerContext(BindingList<BlockStep> Steps, BlockStep? Owner);
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
